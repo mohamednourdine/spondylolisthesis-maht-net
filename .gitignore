@@ -1,0 +1,205 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
+*.virtualenv
+
+# PyCharm
+.idea/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# Environments
+.env
+.env.local
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Data files (raw data, processed data, and large files)
+data/raw/*.jpg
+data/raw/*.jpeg
+data/raw/*.png
+data/raw/*.dcm
+data/raw/*.nii
+data/raw/*.nii.gz
+data/processed/*.npy
+data/processed/*.npz
+data/processed/*.h5
+data/processed/*.hdf5
+data/Train/Keypointrcnn_data/images/**/*.jpg
+data/Train/Keypointrcnn_data/images/**/*.jpeg
+data/Train/Keypointrcnn_data/images/**/*.png
+data/Test/**/*.jpg
+data/Test/**/*.jpeg
+data/Test/**/*.png
+
+# Keep JSON annotation files but ignore large datasets
+# Uncomment if you want to exclude annotations as well
+# data/annotations/*.json
+# data/Train/Keypointrcnn_data/labels/**/*.json
+
+# Model weights and checkpoints
+*.pth
+*.pt
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+*.ckpt
+checkpoints/
+saved_models/
+weights/
+*.safetensors
+
+# Experiment results
+experiments/results/*.png
+experiments/results/*.jpg
+experiments/results/*.pdf
+experiments/results/*.csv
+experiments/results/**/*.pth
+experiments/results/**/*.pt
+experiments/logs/
+logs/
+runs/
+wandb/
+mlruns/
+
+# TensorBoard
+events.out.tfevents.*
+
+# PyTorch Lightning
+lightning_logs/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.log
+
+# Documentation builds
+docs/_build/
+docs/_static/
+docs/_templates/
+site/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.cache/
+
+# Large files (use Git LFS if needed)
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Configuration files with sensitive data
+config/secrets.yaml
+config/credentials.json
+.secrets/
+*.key
+*.pem
+
+# Data
+
+data/Test
+data/Train

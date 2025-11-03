@@ -1,0 +1,21 @@
+model_name: "ResNet Keypoint Detector"
+input_size: [256, 256]
+num_classes: 5
+learning_rate: 0.001
+batch_size: 32
+num_epochs: 50
+optimizer: "Adam"
+loss_function: "CrossEntropyLoss"
+data_augmentation:
+  horizontal_flip: true
+  vertical_flip: false
+  rotation: 15
+  zoom: 0.1
+checkpoint_path: "./experiments/results/resnet_checkpoint.pth"
+log_interval: 10
+evaluation:
+  metrics:
+    - "Accuracy"
+    - "Precision"
+    - "Recall"
+    - "F1 Score"

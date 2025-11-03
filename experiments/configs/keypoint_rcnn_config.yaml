@@ -1,0 +1,36 @@
+model:
+  name: Keypoint R-CNN
+  backbone: ResNet50
+  num_classes: 2  # Background and Spondylolisthesis
+  input_size: [256, 256]  # Input image size
+  pretrain: True  # Use pretrained weights
+
+training:
+  batch_size: 16
+  learning_rate: 0.001
+  num_epochs: 50
+  optimizer: Adam
+  weight_decay: 1e-4
+  scheduler:
+    step_size: 10
+    gamma: 0.1
+
+data:
+  train_data_path: ../data/processed/train/
+  val_data_path: ../data/processed/val/
+  test_data_path: ../data/processed/test/
+  augmentation:
+    horizontal_flip: true
+    vertical_flip: false
+    rotation: 15  # Degrees
+
+evaluation:
+  metrics:
+    - mean_average_precision
+    - mean_squared_error
+  save_best_model: true
+  model_save_path: ../experiments/results/keypoint_rcnn_best.pth
+
+logging:
+  log_dir: ../experiments/results/logs/
+  log_interval: 10  # Log every 10 batches
