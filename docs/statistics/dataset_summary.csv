@@ -1,0 +1,4 @@
+Split,Total Annotations,With Demographics,Without Demographics,Male,Female,Avg Age,Min Age,Max Age,Complete Annotations
+Training,494,330,164,136,194,47.7,7,87,34
+Validation,204,204,0,89,115,48.8,13,93,1
+TOTAL,698,534,164,225,309,48.1,7,93,35

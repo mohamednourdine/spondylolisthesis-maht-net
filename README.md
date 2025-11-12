@@ -13,11 +13,27 @@ cd spondylolisthesis-maht-net
 pip install -r requirements.txt
 ```
 
+## Dataset
+
+Download the dateset from this url
+
+```bash
+https://data.mendeley.com/datasets/5jdfdgp762/1
+```
+
 ## Usage
 
 1. **Data Exploration**: Use the notebooks in the `notebooks` directory to explore the dataset and visualize the characteristics of spondylolisthesis images.
 2. **Model Training**: Implement and train the models using the provided notebooks. Each notebook corresponds to a specific model architecture.
 3. **Evaluation**: Evaluate the models using the evaluation scripts in the `src/evaluation` directory.
+
+## Usies
+
+Fix permission issues
+
+```bash
+chmod -R u+w /private/var/www/phd-researches/spondylolisthesis-maht-net/data/Train/Keypointrcnn_data/labels/
+```
 
 ## Contributing
 
