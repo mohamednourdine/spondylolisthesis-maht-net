@@ -37,7 +37,6 @@ class SpondylolisthesisAugmentation:
                     scale_limit=0.1,        # ±10% scaling
                     rotate_limit=10,        # ±10° rotation
                     border_mode=cv2.BORDER_CONSTANT,
-                    value=0,
                     p=0.7
                 ),
                 
@@ -53,7 +52,7 @@ class SpondylolisthesisAugmentation:
                 
                 # Add noise
                 A.OneOf([
-                    A.GaussNoise(var_limit=(10, 50)),
+                    A.GaussNoise(var_limit=(10.0, 50.0)),
                     A.MultiplicativeNoise(multiplier=(0.9, 1.1)),
                 ], p=0.3),
                 

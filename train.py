@@ -86,12 +86,16 @@ def setup_training(args):
     if args.lr:
         Config.LEARNING_RATE = args.lr
     
-    # Set device
-    device = torch.device('cuda' if torch.cuda.is_available() and Config.DEVICE == 'cuda' else 'cpu')
-    print(f"\nDevice: {device}")
-    if device.type == 'cuda':
+    # Set device - prioritize CUDA if available
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+        print(f"\nDevice: {device}")
         print(f"GPU: {torch.cuda.get_device_name(0)}")
         print(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
+    else:
+        device = torch.device('cpu')
+        print(f"\nDevice: {device}")
+        print("⚠️  CUDA not available - using CPU (training will be slow)")
     
     # Set random seeds
     torch.manual_seed(Config.RANDOM_SEED)
