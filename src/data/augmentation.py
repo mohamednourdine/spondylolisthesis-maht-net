@@ -64,12 +64,6 @@ class SpondylolisthesisAugmentation:
                     A.Sharpen(alpha=(0.2, 0.5), lightness=(0.5, 1.0)),
                 ], p=0.3),
                 
-                # Simulated artifacts
-                A.OneOf([
-                    A.GridDistortion(num_steps=5, distort_limit=0.1),
-                    A.ElasticTransform(alpha=1, sigma=50, alpha_affine=50),
-                ], p=0.2),
-                
                 # Ensure proper range
                 A.Normalize(mean=[0.0], std=[1.0], max_pixel_value=1.0),
                 
