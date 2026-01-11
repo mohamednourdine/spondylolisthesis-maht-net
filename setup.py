@@ -4,7 +4,7 @@ setup(
     name='spondylolisthesis-maht-net',
     version='0.1.0',
     author='Your Name',
-    author_email='your.email@example.com',
+    author_email='mohamednjikam25@hotmail.com',
     description='Automated Spondylolisthesis Grading using MAHT-Net',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',

@@ -24,7 +24,7 @@ class BaseConfig:
     
     # Common hyperparameters
     BATCH_SIZE = 16
-    NUM_WORKERS = 4
+    NUM_WORKERS = 2  # Reduced for Google Colab compatibility
     NUM_EPOCHS = 50
     LEARNING_RATE = 0.001
     WEIGHT_DECAY = 1e-4

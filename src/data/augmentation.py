@@ -31,12 +31,13 @@ class SpondylolisthesisAugmentation:
         
         if self.mode == 'train':
             return A.Compose([
-                # Geometric transforms
-                A.ShiftScaleRotate(
-                    shift_limit=0.05,       # ±5% translation
-                    scale_limit=0.1,        # ±10% scaling
-                    rotate_limit=10,        # ±10° rotation
-                    border_mode=cv2.BORDER_CONSTANT,
+                # Geometric transforms - using Affine (ShiftScaleRotate is deprecated)
+                A.Affine(
+                    translate_percent={'x': (-0.05, 0.05), 'y': (-0.05, 0.05)},  # ±5% translation
+                    scale=(0.9, 1.1),       # ±10% scaling
+                    rotate=(-10, 10),       # ±10° rotation
+                    mode=cv2.BORDER_CONSTANT,
+                    cval=0,
                     p=0.7
                 ),
                 
@@ -50,7 +51,7 @@ class SpondylolisthesisAugmentation:
                     p=0.5
                 ),
                 
-                # Add noise
+                # Add noise - GaussNoise now uses 'var_limit' as a single tuple
                 A.OneOf([
                     A.GaussNoise(var_limit=(10.0, 50.0)),
                     A.MultiplicativeNoise(multiplier=(0.9, 1.1)),

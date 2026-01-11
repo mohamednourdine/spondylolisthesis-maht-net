@@ -17,11 +17,11 @@
   "LR_PATIENCE": 5,
   "USE_AUGMENTATION": true,
   "AUGMENTATION_MODE": "train",
-  "BATCH_SIZE": 8,
+  "BATCH_SIZE": 16,
   "NUM_EPOCHS": 50,
-  "get_model_config": "<classmethod object at 0x13b002d60>",
-  "get_loss_config": "<classmethod object at 0x13b002dc0>",
-  "get_optimizer_config": "<classmethod object at 0x13b002df0>",
-  "get_scheduler_config": "<classmethod object at 0x13b002e20>",
+  "get_model_config": "<classmethod(<function UNetConfig.get_model_config at 0x7e65ce0bb420>)>",
+  "get_loss_config": "<classmethod(<function UNetConfig.get_loss_config at 0x7e65ce0bb4c0>)>",
+  "get_optimizer_config": "<classmethod(<function UNetConfig.get_optimizer_config at 0x7e65ce0bb560>)>",
+  "get_scheduler_config": "<classmethod(<function UNetConfig.get_scheduler_config at 0x7e65ce0bb600>)>",
   "model_name": "unet"
 }

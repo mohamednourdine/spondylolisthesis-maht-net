@@ -287,7 +287,7 @@ Having issues? Check:
 ## 📧 Contact
 
 **Project Lead**: Mohamed Nourdine  
-**Email**: your.email@example.com  
+**Email**: mohamednjikam25@hotmail.com  
 **GitHub**: [@mohamednourdine](https://github.com/mohamednourdine)
 
 ---
