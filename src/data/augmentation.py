@@ -36,8 +36,6 @@ class SpondylolisthesisAugmentation:
                     translate_percent={'x': (-0.05, 0.05), 'y': (-0.05, 0.05)},  # ±5% translation
                     scale=(0.9, 1.1),       # ±10% scaling
                     rotate=(-10, 10),       # ±10° rotation
-                    mode=cv2.BORDER_CONSTANT,
-                    cval=0,
                     p=0.7
                 ),
                 
@@ -51,10 +49,10 @@ class SpondylolisthesisAugmentation:
                     p=0.5
                 ),
                 
-                # Add noise - GaussNoise now uses 'var_limit' as a single tuple
+                # Add noise - Using correct GaussNoise API
                 A.OneOf([
-                    A.GaussNoise(var_limit=(10.0, 50.0)),
-                    A.MultiplicativeNoise(multiplier=(0.9, 1.1)),
+                    A.GaussNoise(var_limit=(10.0, 50.0), mean=0, per_channel=False, p=1.0),
+                    A.MultiplicativeNoise(multiplier=(0.9, 1.1), per_channel=False, p=1.0),
                 ], p=0.3),
                 
                 # Blur/sharpening
