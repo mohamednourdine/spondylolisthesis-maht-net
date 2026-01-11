@@ -22,11 +22,14 @@ python train.py --model unet --epochs 2 --batch-size 2 --experiment-name quick_t
 
 #### Cloud Training (Google Colab / Full Dataset)
 ```bash
-# Production training
-python train.py --model unet --epochs 50 --batch-size 16 --experiment-name production_v1
+# Production training (batch size 8 for T4 GPU 15GB)
+python train.py --model unet --epochs 50 --batch-size 8 --experiment-name production_v1
 
 # With custom learning rate
-python train.py --model unet --epochs 50 --batch-size 16 --lr 0.0005 --experiment-name lr_0005
+python train.py --model unet --epochs 50 --batch-size 8 --lr 0.0005 --experiment-name lr_0005
+
+# For GPUs with more memory (V100, A100), you can use larger batch sizes:
+python train.py --model unet --epochs 50 --batch-size 16 --experiment-name production_v1
 ```
 
 #### Resume Training
@@ -139,8 +142,10 @@ python train.py --model unet --config config/custom_unet_config.py
 
 3. **Run training**:
    ```bash
-   !python train.py --model unet --epochs 50 --batch-size 32 --experiment-name colab_run1
+   !python train.py --model unet --epochs 50 --batch-size 8 --experiment-name colab_run1
    ```
+   
+   **Note**: Batch size 8 is recommended for T4 GPUs (15GB). Use `--batch-size 16` for V100/A100.
 
 4. **Monitor training**:
    ```python
@@ -158,7 +163,7 @@ python train.py --model unet --config config/custom_unet_config.py
 
 2. **Train in Cloud** (full dataset):
    ```bash
-   python train.py --model unet --epochs 50 --batch-size 16 --experiment-name production_v1
+   python train.py --model unet --epochs 50 --batch-size 8 --experiment-name production_v1
    ```
 
 3. **Compare Results**:
@@ -175,7 +180,10 @@ python train.py --model unet --config config/custom_unet_config.py
 ## ⚡ Tips
 
 - Use `test_training_small.py` before any full training run
-- Descriptive experiment names help: `unet_lr001_bs16_focal`
+- Descriptive experiment names help: `unet_lr001_bs8_focal`
 - Check `training_history.json` for detailed metrics
 - Best models are automatically saved during training
 - Resume from `last_model.pth` if training is interrupted
+- **Batch size 8** is optimal for T4 GPUs (15GB memory)
+- Use `--batch-size 4` if you still get OOM errors
+- Clear CUDA cache is automatically handled between batches

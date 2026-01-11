@@ -100,16 +100,17 @@ python tests/test_training_small.py
 #### Full Training (Cloud - Complete Dataset)
 ```bash
 # Train U-Net (50 epochs, ~6-8 hours on GPU)
-python train.py --model unet --epochs 50 --batch-size 16 --experiment-name production_v1
+# Batch size 8 is optimal for T4 GPU (15GB) - use 4 if OOM errors occur
+python train.py --model unet --epochs 50 --batch-size 8 --experiment-name production_v1
 
 # Train MAHT-Net (when implemented)
-python train.py --model maht-net --epochs 50 --batch-size 16 --experiment-name production_v1
+python train.py --model maht-net --epochs 50 --batch-size 8 --experiment-name production_v1
 
 # Train ResNet-Keypoint (when implemented)
-python train.py --model resnet-keypoint --epochs 50 --batch-size 16 --experiment-name production_v1
+python train.py --model resnet-keypoint --epochs 50 --batch-size 8 --experiment-name production_v1
 
 # Train Keypoint-RCNN (when implemented)
-python train.py --model keypoint-rcnn --epochs 50 --batch-size 16 --experiment-name production_v1
+python train.py --model keypoint-rcnn --epochs 50 --batch-size 8 --experiment-name production_v1
 ```
 
 #### Resume Training
@@ -315,7 +316,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 python tests/test_training_small.py
 
 # Train full model in cloud
-python train.py --model unet --epochs 50 --batch-size 16 --experiment-name production_v1
+python train.py --model unet --epochs 50 --batch-size 8 --experiment-name production_v1
 
 # Compare results
 python scripts/compare_experiments.py --model unet

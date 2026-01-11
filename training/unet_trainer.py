@@ -48,6 +48,10 @@ class UNetTrainer(BaseTrainer):
             loss.backward()
             self.optimizer.step()
             
+            # Clear cache to prevent memory buildup
+            if self.device.type == 'cuda':
+                torch.cuda.empty_cache()
+            
             running_loss += loss.item()
             num_batches += 1
             

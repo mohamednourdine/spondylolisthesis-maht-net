@@ -23,7 +23,7 @@ class BaseConfig:
     VAL_LABEL_DIR = DATA_ROOT / 'labels' / 'val'
     
     # Common hyperparameters
-    BATCH_SIZE = 16
+    BATCH_SIZE = 8  # Reduced to 8 for GPU memory efficiency (works on T4 15GB)
     NUM_WORKERS = 2  # Reduced for Google Colab compatibility
     NUM_EPOCHS = 50
     LEARNING_RATE = 0.001
