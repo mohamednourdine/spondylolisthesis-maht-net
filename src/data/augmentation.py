@@ -49,9 +49,9 @@ class SpondylolisthesisAugmentation:
                     p=0.5
                 ),
                 
-                # Add noise - Using correct GaussNoise API
+                # Add noise - simplified for compatibility
                 A.OneOf([
-                    A.GaussNoise(var_limit=(10.0, 50.0), mean=0, per_channel=False, p=1.0),
+                    A.GaussNoise(p=1.0),
                     A.MultiplicativeNoise(multiplier=(0.9, 1.1), per_channel=False, p=1.0),
                 ], p=0.3),
                 

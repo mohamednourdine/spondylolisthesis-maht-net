@@ -99,6 +99,8 @@ python tests/test_training_small.py
 
 #### Full Training (Cloud - Complete Dataset)
 ```bash
+
+cd drive/Othercomputers/My Mac/phd/spondylolisthesis-maht-net
 # Train U-Net (50 epochs, ~6-8 hours on GPU)
 # Batch size 8 is optimal for T4 GPU (15GB) - use 4 if OOM errors occur
 python train.py --model unet --epochs 50 --batch-size 8 --experiment-name production_v1
