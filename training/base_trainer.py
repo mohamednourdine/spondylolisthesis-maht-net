@@ -283,6 +283,9 @@ class BaseTrainer(ABC):
                     print(f"  Train MRE: {train_other['MRE_px']:.2f} px")
                 elif 'MRE' in train_other:  # Backward compatibility
                     print(f"  Train MRE: {train_other['MRE']:.2f}")
+                # Print MSE if available
+                if 'MSE_px' in train_other:
+                    print(f"  Train MSE: {train_other['MSE_px']:.2f} px²")
                 # Print SDR metrics in ascending order (2px, 4px, 8px, 16px)
                 sdr_metrics = {k: v for k, v in train_other.items() if 'SDR' in k}
                 if sdr_metrics:
@@ -296,8 +299,8 @@ class BaseTrainer(ABC):
                     sorted_sdr = sorted(sdr_metrics.items(), key=lambda x: get_threshold_value(x[0]))
                     sdr_str = ', '.join([f"{k.replace('SDR_', '')}: {v:.4f}" for k, v in sorted_sdr])
                     print(f"  Train SDR: {sdr_str}")
-                # Print any other metrics
-                other = {k: v for k, v in train_other.items() if k not in ['MRE', 'MRE_px', 'MRE_mm'] and 'SDR' not in k}
+                # Print any other metrics (excluding already printed ones)
+                other = {k: v for k, v in train_other.items() if k not in ['MRE', 'MRE_px', 'MRE_mm', 'MSE_px'] and 'SDR' not in k}
                 for key, value in other.items():
                     print(f"  Train {key}: {value:.4f}")
             
@@ -309,6 +312,9 @@ class BaseTrainer(ABC):
                     print(f"  Val MRE:   {val_other['MRE_px']:.2f} px")
                 elif 'MRE' in val_other:  # Backward compatibility
                     print(f"  Val MRE:   {val_other['MRE']:.2f}")
+                # Print MSE if available
+                if 'MSE_px' in val_other:
+                    print(f"  Val MSE:   {val_other['MSE_px']:.2f} px²")
                 # Print SDR metrics in ascending order (2px, 4px, 8px, 16px)
                 sdr_metrics = {k: v for k, v in val_other.items() if 'SDR' in k}
                 if sdr_metrics:
@@ -321,8 +327,8 @@ class BaseTrainer(ABC):
                     sorted_sdr = sorted(sdr_metrics.items(), key=lambda x: get_threshold_value(x[0]))
                     sdr_str = ', '.join([f"{k.replace('SDR_', '')}: {v:.4f}" for k, v in sorted_sdr])
                     print(f"  Val SDR:   {sdr_str}")
-                # Print any other metrics
-                other = {k: v for k, v in val_other.items() if k not in ['MRE', 'MRE_px', 'MRE_mm'] and 'SDR' not in k}
+                # Print any other metrics (excluding already printed ones)
+                other = {k: v for k, v in val_other.items() if k not in ['MRE', 'MRE_px', 'MRE_mm', 'MSE_px'] and 'SDR' not in k}
                 for key, value in other.items():
                     print(f"  Val {key}: {value:.4f}")
             

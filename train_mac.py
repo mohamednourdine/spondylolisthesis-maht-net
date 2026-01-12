@@ -26,6 +26,7 @@ from training.losses import (
     MSEWithWeightedBackground
 )
 from training.unet_trainer import UNetTrainer
+from evaluation.keypoint_evaluator import get_global_evaluator
 from torch.utils.data import DataLoader
 
 
@@ -132,10 +133,12 @@ def main():
     print(f"   {'='*56}")
     print(f"   Training Set:")
     print(f"     - Images: {len(train_dataset)} samples")
-    print(f"     - Augmentation: {'✓ Enabled (light)' if train_augmentation else '✗ Disabled'}")
+    print(f"     - Augmentation: {'✓ Enabled' if train_augmentation else '✗ Disabled'}")
     if train_augmentation:
         print(f"       • Horizontal flips (50% probability)")
-        print(f"       • Random rotation (±5°, 30% probability)")
+        print(f"       • Random rotation (±10°, 50% probability)")
+        print(f"       • Brightness/Contrast (±20%, 50% probability)")
+        print(f"       • Gaussian noise (30% probability)")
         print(f"       • Each image seen {config.NUM_EPOCHS}x with variations")
         print(f"       • Effective training samples: ~{len(train_dataset) * config.NUM_EPOCHS} (with augmentation)")
     print(f"\n   Validation Set:")
@@ -177,18 +180,22 @@ def main():
     
     # Create model (smaller version)
     print("\n2. Creating model...")
+    dropout_rate = getattr(config, 'DROPOUT_RATE', 0.0)
     model = ModelRegistry.create(
         'unet',
         in_channels=config.IN_CHANNELS,
         num_keypoints=config.NUM_KEYPOINTS,
         bilinear=config.BILINEAR,
-        base_channels=config.BASE_CHANNELS
+        base_channels=config.BASE_CHANNELS,
+        dropout_rate=dropout_rate
     )
     model = model.to(device)
     
     # Count parameters
     total_params = sum(p.numel() for p in model.parameters())
     print(f"   Model parameters: {total_params / 1e6:.2f}M")
+    if dropout_rate > 0:
+        print(f"   Dropout rate: {dropout_rate}")
     
     # Create loss and optimizer
     print("\n3. Setting up training...")
@@ -231,6 +238,13 @@ def main():
         patience=config.SCHEDULER_PATIENCE,
         min_lr=config.SCHEDULER_MIN_LR,
         verbose=True
+    )
+    
+    # Initialize evaluator with pixel-based thresholds (standard practice)
+    print(f"\n   SDR thresholds (pixels): {config.SDR_THRESHOLDS_PX}")
+    print(f"   Note: Using pixel-based metrics (calibration metadata unavailable)")
+    evaluator = get_global_evaluator(
+        sdr_thresholds_px=config.SDR_THRESHOLDS_PX
     )
     
     # Create config dict for trainer

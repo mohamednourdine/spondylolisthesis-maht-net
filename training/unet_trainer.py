@@ -82,12 +82,18 @@ class UNetTrainer(BaseTrainer):
             if batch_metrics_list:
                 last_metrics = batch_metrics_list[-1]
                 mre_key = 'MRE_mm' if 'MRE_mm' in last_metrics else 'MRE_px'
-                pbar.set_postfix({
+                # Get first SDR key dynamically (e.g., SDR_6px)
+                sdr_keys = [k for k in last_metrics.keys() if k.startswith('SDR_')]
+                first_sdr_key = sdr_keys[0] if sdr_keys else None
+                
+                postfix = {
                     'loss': f'{loss.item():.4f}',
                     'MRE': f'{last_metrics[mre_key]:.1f}',
-                    'SDR_2px': f'{last_metrics["SDR_2px"]:.3f}',
                     'pred_range': f'[{pred_heatmaps.min().item():.1f},{pred_heatmaps.max().item():.1f}]'
-                })
+                }
+                if first_sdr_key:
+                    postfix[first_sdr_key] = f'{last_metrics[first_sdr_key]:.3f}'
+                pbar.set_postfix(postfix)
             else:
                 pbar.set_postfix({
                     'loss': f'{loss.item():.4f}',
@@ -149,12 +155,18 @@ class UNetTrainer(BaseTrainer):
                 if batch_metrics_list:
                     last_metrics = batch_metrics_list[-1]
                     mre_key = 'MRE_mm' if 'MRE_mm' in last_metrics else 'MRE_px'
-                    pbar.set_postfix({
+                    # Get first SDR key dynamically
+                    sdr_keys = [k for k in last_metrics.keys() if k.startswith('SDR_')]
+                    first_sdr_key = sdr_keys[0] if sdr_keys else None
+                    
+                    postfix = {
                         'loss': f'{loss.item():.4f}',
                         'MRE': f'{last_metrics[mre_key]:.1f}',
-                        'SDR_2px': f'{last_metrics["SDR_2px"]:.3f}',
                         'pred_range': f'[{pred_heatmaps.min().item():.1f},{pred_heatmaps.max().item():.1f}]'
-                    })
+                    }
+                    if first_sdr_key:
+                        postfix[first_sdr_key] = f'{last_metrics[first_sdr_key]:.3f}'
+                    pbar.set_postfix(postfix)
                 else:
                     pbar.set_postfix({'loss': f'{loss.item():.4f}'})
         

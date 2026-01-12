@@ -8,6 +8,28 @@ import numpy as np
 from typing import Dict, List, Tuple, Optional
 
 
+def calculate_mse(predictions, targets):
+    """
+    Calculate Mean Squared Error (MSE) - Mean of squared Euclidean distances.
+    
+    This is reported in many papers alongside MRE. MSE emphasizes larger errors
+    more than MRE due to the squaring.
+    
+    Args:
+        predictions: Predicted keypoints [N, 2] or [N, M, 2]
+        targets: Target keypoints [N, 2] or [N, M, 2]
+        
+    Returns:
+        Mean squared error in pixels²
+    """
+    if isinstance(predictions, torch.Tensor):
+        squared_distances = ((predictions - targets) ** 2).sum(dim=-1)
+        return squared_distances.mean().item()
+    else:
+        squared_distances = ((predictions - targets) ** 2).sum(axis=-1)
+        return float(squared_distances.mean())
+
+
 def calculate_mre(predictions, targets):
     """
     Calculate Mean Radial Error (MRE) - Euclidean distance between predicted and target keypoints.

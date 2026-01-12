@@ -1,23 +1,29 @@
 {
   "_comment": "Pixel spacing calibration configuration",
   "_units": "mm per pixel",
-  "default_pixel_spacing_mm": 0.167,
+  "default_pixel_spacing_mm": 0.609,
   "dataset_info": {
     "type": "spine_xray",
-    "source": "manual_configuration",
-    "calibration_method": "Please update with actual calibration data"
-  },
-  "images": {
-    "example_image.jpg": {
-      "spacing": 0.167,
-      "source": "template",
-      "notes": "Update with actual values"
+    "source": "calculated_from_dataset",
+    "calibration_method": "Measured vertebra dimensions from annotations",
+    "analysis_details": {
+      "script": "scripts/calculate_calibration.py",
+      "date": "2024",
+      "images_analyzed": 20,
+      "vertebrae_measured": 141,
+      "image_dimensions": "640x640 pixels",
+      "vertebra_height_px": "39.3 ± 7.4 px",
+      "vertebra_width_px": "79.2 ± 22.5 px",
+      "clinical_reference_height_mm": 27.0,
+      "clinical_reference_width_mm": 42.0,
+      "calculated_from_height": "0.688 mm/px",
+      "calculated_from_width": "0.530 mm/px",
+      "average": "0.609 mm/px"
     }
   },
-  "instructions": {
-    "1": "Set default_pixel_spacing_mm based on your imaging equipment",
-    "2": "Add per-image calibration if spacing varies",
-    "3": "Document calibration method for reproducibility",
-    "4": "Common spine X-ray values: 0.14-0.20 mm/pixel"
+  "conversion": {
+    "pixels_per_mm": 1.6,
+    "mm_per_pixel": 0.609,
+    "note": "1mm = 1.6 pixels, or 1 pixel = 0.609mm"
   }
 }

@@ -8,7 +8,7 @@ Supports dual reporting (pixels and mm) for clinical applications.
 import torch
 import numpy as np
 from typing import Dict, List, Optional
-from .metrics import calculate_mre, calculate_sdr
+from .metrics import calculate_mre, calculate_mse, calculate_sdr
 from .calibration import PixelSpacingCalibrator
 
 
@@ -29,7 +29,7 @@ class KeypointEvaluator:
     
     def __init__(
         self,
-        sdr_thresholds_px: List[float] = [2.0, 4.0, 8.0, 16.0],
+        sdr_thresholds_px: List[float] = [6.0, 12.0, 18.0, 24.0],
         calibrator: Optional[PixelSpacingCalibrator] = None,
         report_physical_metrics: bool = True
     ):
@@ -153,8 +153,11 @@ class KeypointEvaluator:
         # Calculate MRE in pixels (always)
         mre_px = calculate_mre(pred_array, target_array)
         
+        # Calculate MSE in pixels² (reported in many papers)
+        mse_px = calculate_mse(pred_array, target_array)
+        
         # Calculate SDR at pixel thresholds (always)
-        metrics = {'MRE_px': mre_px}
+        metrics = {'MRE_px': mre_px, 'MSE_px': mse_px}
         for threshold_px in self.sdr_thresholds_px:
             sdr = calculate_sdr(pred_array, target_array, threshold_px)
             threshold_str = f'{int(threshold_px)}px' if threshold_px == int(threshold_px) else f'{threshold_px}px'
@@ -261,15 +264,19 @@ _global_evaluator = None
 
 
 def get_global_evaluator(
-    sdr_thresholds: Optional[List[float]] = None,
-    pixel_spacing: float = 1.0
+    sdr_thresholds_px: Optional[List[float]] = None,
+    sdr_thresholds_mm: Optional[List[float]] = None,
+    calibration_file: Optional[str] = None
 ) -> KeypointEvaluator:
     """
     Get or create global evaluator instance.
     
+    Supports both pixel-based (standard) and mm-based (when calibration available) modes.
+    
     Args:
-        sdr_thresholds: List of SDR thresholds in pixels (default: [2, 4, 8, 16])
-        pixel_spacing: Deprecated - use calibrator instead
+        sdr_thresholds_px: List of SDR thresholds in pixels (default: [6, 12, 18, 24])
+        sdr_thresholds_mm: List of SDR thresholds in mm (optional, requires calibration)
+        calibration_file: Path to calibration JSON file (optional)
         
     Returns:
         Global KeypointEvaluator instance
@@ -277,12 +284,47 @@ def get_global_evaluator(
     global _global_evaluator
     
     if _global_evaluator is None:
-        if sdr_thresholds is None:
-            sdr_thresholds = [2.0, 4.0, 8.0, 16.0]
-        _global_evaluator = KeypointEvaluator(
-            sdr_thresholds_px=sdr_thresholds,
-            calibrator=None,
-            report_physical_metrics=False
-        )
+        # Pixel-based mode (standard practice when calibration unavailable)
+        if sdr_thresholds_px is not None:
+            _global_evaluator = KeypointEvaluator(
+                sdr_thresholds_px=sdr_thresholds_px,
+                calibrator=None,
+                report_physical_metrics=False
+            )
+        # MM-based mode (when calibration available)
+        elif sdr_thresholds_mm is not None:
+            if sdr_thresholds_mm is None:
+                sdr_thresholds_mm = [0.5, 1.0, 2.0, 4.0]
+            
+            # Load calibrator if file provided
+            calibrator = None
+            if calibration_file:
+                try:
+                    calibrator = PixelSpacingCalibrator(calibration_file)
+                except Exception as e:
+                    print(f"Warning: Could not load calibration file: {e}")
+            
+            # Convert mm thresholds to pixels
+            if calibrator and calibrator.default_spacing:
+                sdr_thresholds_px = [
+                    calibrator.mm_to_pixels(t) for t in sdr_thresholds_mm
+                ]
+            else:
+                # Use default spacing: 0.167 mm/px
+                default_mm_per_px = 0.167
+                sdr_thresholds_px = [t / default_mm_per_px for t in sdr_thresholds_mm]
+            
+            _global_evaluator = KeypointEvaluator(
+                sdr_thresholds_px=sdr_thresholds_px,
+                calibrator=calibrator,
+                report_physical_metrics=True if calibrator else False
+            )
+        else:
+            # Default: pixel-based with standard thresholds
+            _global_evaluator = KeypointEvaluator(
+                sdr_thresholds_px=[6.0, 12.0, 18.0, 24.0],
+                calibrator=None,
+                report_physical_metrics=False
+            )
     
     return _global_evaluator

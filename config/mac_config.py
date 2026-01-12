@@ -53,17 +53,28 @@ class MacConfig:
     NUM_KEYPOINTS = MAX_VERTEBRAE * CORNERS_PER_VERTEBRA  # 40 output channels
     BILINEAR = True  # Faster than transposed conv
     BASE_CHANNELS = 64  # Full size model (17.27M params)
+    DROPOUT_RATE = 0.3  # Added to reduce overfitting
     
     # Heatmap settings - CRITICAL: Amplitude must match model output range!
-    # For 512x512 images, sigma=10.0 matches old project's relative sigma (5.0 for 256x256)
+    # Larger sigma = larger Gaussian peaks = easier for model to learn
     # UNet without final activation produces outputs roughly [-10, 200] range
     # Using amplitude=10.0 (instead of 1000) allows model to match target scale
-    HEATMAP_SIGMA = 10.0  # Scaled from old project: 5.0 * (512/256) = 10.0
+    HEATMAP_SIGMA = 15.0  # Increased from 10.0 for larger, easier-to-detect peaks
     HEATMAP_AMPLITUDE = 10.0  # Reduced from 1000 to match UNet output range
     OUTPUT_STRIDE = 1
     
+    # ===== EVALUATION SETTINGS =====
+    # SDR thresholds in pixels (standard practice for datasets without calibration)
+    # Note: Pixel spacing metadata unavailable for this dataset (JPG format, no DICOM)
+    # Using pixel-based metrics as per standard practice in vertebra landmark detection
+    # Thresholds represent 15%, 31%, 46%, 61% of average vertebra height (39px)
+    SDR_THRESHOLDS_PX = [6, 12, 18, 24]  # Pixel-based accuracy thresholds
+    
+    # Future work: Obtain calibration data for mm-based clinical metrics
+    # Typical spine X-ray calibration: 0.14-0.20 mm/px (when available)
+    
     # ===== TRAINING SETTINGS =====
-    LEARNING_RATE = 0.001
+    LEARNING_RATE = 0.0003  # Reduced from 0.001 to prevent overfitting
     WEIGHT_DECAY = 1e-4
     
     # Loss function ('focal', 'adaptive_wing', 'combined', 'weighted_mse')

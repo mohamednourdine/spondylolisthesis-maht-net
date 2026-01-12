@@ -196,13 +196,15 @@ class MSEWithWeightedBackground(nn.Module):
     Model outputs raw heatmaps directly.
     """
     
-    def __init__(self, background_weight=0.1):
+    def __init__(self, background_weight=0.05, keypoint_weight=5.0):
         """
         Args:
-            background_weight: Weight for background pixels (default: 0.1)
+            background_weight: Weight for background pixels (default: 0.05, reduced from 0.1)
+            keypoint_weight: Weight for keypoint regions (default: 5.0, increased)
         """
         super(MSEWithWeightedBackground, self).__init__()
         self.background_weight = background_weight
+        self.keypoint_weight = keypoint_weight
     
     def forward(self, pred_heatmaps, target_heatmaps):
         """
@@ -217,7 +219,7 @@ class MSEWithWeightedBackground(nn.Module):
         # Create weight map: low weight for background, high weight for keypoints
         weights = torch.where(
             target_heatmaps > 0.1,  # Near keypoints
-            torch.ones_like(target_heatmaps),
+            torch.full_like(target_heatmaps, self.keypoint_weight),
             torch.full_like(target_heatmaps, self.background_weight)
         )
         

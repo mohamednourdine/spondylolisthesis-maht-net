@@ -127,7 +127,7 @@ calibrator = PixelSpacingCalibrator(
 
 # Create evaluator
 evaluator = KeypointEvaluator(
-    sdr_thresholds_px=[2.0, 4.0, 8.0, 16.0],
+    sdr_thresholds_px=[6.0, 12.0, 18.0, 24.0],
     calibrator=calibrator,
     report_physical_metrics=True
 )

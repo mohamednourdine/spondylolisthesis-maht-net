@@ -307,9 +307,13 @@ class LightAugmentation:
         
         if self.mode == 'train':
             return A.Compose([
-                # Only basic geometric transforms
+                # Geometric transforms
                 A.HorizontalFlip(p=0.5),
-                A.Rotate(limit=5, p=0.3),  # Very light rotation
+                A.Rotate(limit=10, p=0.5),  # Increased rotation ±10°
+                
+                # Intensity transforms (helps with generalization)
+                A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.5),
+                A.GaussNoise(var_limit=(5.0, 20.0), p=0.3),  # Light noise
                 
                 # Normalize to [-1, 1] (matching old working project)
                 A.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5], max_pixel_value=1.0),

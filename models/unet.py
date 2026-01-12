@@ -94,11 +94,12 @@ class UNet(nn.Module):
         base_channels: Number of channels in first layer (default: 64)
     """
     
-    def __init__(self, in_channels=3, num_keypoints=4, bilinear=False, base_channels=64):
+    def __init__(self, in_channels=3, num_keypoints=4, bilinear=False, base_channels=64, dropout_rate=0.0):
         super(UNet, self).__init__()
         self.in_channels = in_channels
         self.num_keypoints = num_keypoints
         self.bilinear = bilinear
+        self.dropout_rate = dropout_rate
         
         # Encoder
         self.inc = DoubleConv(in_channels, base_channels)
@@ -107,6 +108,9 @@ class UNet(nn.Module):
         self.down3 = Down(base_channels * 4, base_channels * 8)
         factor = 2 if bilinear else 1
         self.down4 = Down(base_channels * 8, base_channels * 16 // factor)
+        
+        # Dropout for regularization
+        self.dropout = nn.Dropout2d(p=dropout_rate) if dropout_rate > 0 else None
         
         # Decoder
         self.up1 = Up(base_channels * 16, base_channels * 8 // factor, bilinear)
@@ -124,6 +128,10 @@ class UNet(nn.Module):
         x3 = self.down2(x2)
         x4 = self.down3(x3)
         x5 = self.down4(x4)
+        
+        # Apply dropout at bottleneck (most effective location)
+        if self.dropout is not None:
+            x5 = self.dropout(x5)
         
         # Decoder with skip connections
         x = self.up1(x5, x4)
