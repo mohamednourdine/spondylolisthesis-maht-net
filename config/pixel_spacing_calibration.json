@@ -1,0 +1,23 @@
+{
+  "_comment": "Pixel spacing calibration configuration",
+  "_units": "mm per pixel",
+  "default_pixel_spacing_mm": 0.167,
+  "dataset_info": {
+    "type": "spine_xray",
+    "source": "manual_configuration",
+    "calibration_method": "Please update with actual calibration data"
+  },
+  "images": {
+    "example_image.jpg": {
+      "spacing": 0.167,
+      "source": "template",
+      "notes": "Update with actual values"
+    }
+  },
+  "instructions": {
+    "1": "Set default_pixel_spacing_mm based on your imaging equipment",
+    "2": "Add per-image calibration if spacing varies",
+    "3": "Document calibration method for reproducibility",
+    "4": "Common spine X-ray values: 0.14-0.20 mm/pixel"
+  }
+}

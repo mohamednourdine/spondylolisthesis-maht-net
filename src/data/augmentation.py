@@ -62,8 +62,8 @@ class SpondylolisthesisAugmentation:
                     A.Sharpen(alpha=(0.2, 0.5), lightness=(0.5, 1.0)),
                 ], p=0.3),
                 
-                # Ensure proper range
-                A.Normalize(mean=[0.0], std=[1.0], max_pixel_value=1.0),
+                # Normalize to [-1, 1] (matching old working project)
+                A.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5], max_pixel_value=1.0),
                 
                 # Convert to tensor
                 ToTensorV2()
@@ -75,8 +75,8 @@ class SpondylolisthesisAugmentation:
         
         elif self.mode == 'val' or self.mode == 'test':
             return A.Compose([
-                # Only normalization for validation/test
-                A.Normalize(mean=[0.0], std=[1.0], max_pixel_value=1.0),
+                # Normalize to [-1, 1] (matching old working project)
+                A.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5], max_pixel_value=1.0),
                 ToTensorV2()
             ], keypoint_params=A.KeypointParams(
                 format='xy',
@@ -186,7 +186,7 @@ class MixedPrecisionAugmentation:
                 contrast_limit=0.1,
                 p=0.3
             ),
-            A.Normalize(mean=[0.0], std=[1.0], max_pixel_value=1.0),
+            A.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5], max_pixel_value=1.0),
             ToTensorV2()
         ], keypoint_params=A.KeypointParams(
             format='xy',
@@ -220,7 +220,7 @@ class MixedPrecisionAugmentation:
                 A.Sharpen(alpha=(0.3, 0.7)),
             ], p=0.4),
             A.GridDistortion(num_steps=5, distort_limit=0.2, p=0.3),
-            A.Normalize(mean=[0.0], std=[1.0], max_pixel_value=1.0),
+            A.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5], max_pixel_value=1.0),
             ToTensorV2()
         ], keypoint_params=A.KeypointParams(
             format='xy',
@@ -266,7 +266,7 @@ def get_augmentation_pipeline(
     
     Args:
         mode: 'train', 'val', or 'test'
-        aug_type: 'standard' or 'mixed'
+        aug_type: 'standard', 'mixed', or 'light'
         **kwargs: Additional arguments for augmentation
         
     Returns:
@@ -276,5 +276,91 @@ def get_augmentation_pipeline(
         return SpondylolisthesisAugmentation(mode=mode, **kwargs)
     elif aug_type == 'mixed':
         return MixedPrecisionAugmentation(mode=mode, **kwargs)
+    elif aug_type == 'light':
+        return LightAugmentation(mode=mode, **kwargs)
     else:
         raise ValueError(f"Unknown augmentation type: {aug_type}")
+
+
+class LightAugmentation:
+    """
+    Minimal augmentation for fast local training (Mac/CPU).
+    Only uses basic geometric transforms - no expensive operations.
+    """
+    
+    def __init__(
+        self, 
+        mode: str = 'train',
+        image_size: Tuple[int, int] = (256, 256)
+    ):
+        """
+        Args:
+            mode: 'train', 'val', or 'test'
+            image_size: Image dimensions (width, height)
+        """
+        self.mode = mode
+        self.image_size = image_size
+        self.transform = self._build_transform()
+    
+    def _build_transform(self):
+        """Build minimal augmentation pipeline."""
+        
+        if self.mode == 'train':
+            return A.Compose([
+                # Only basic geometric transforms
+                A.HorizontalFlip(p=0.5),
+                A.Rotate(limit=5, p=0.3),  # Very light rotation
+                
+                # Normalize to [-1, 1] (matching old working project)
+                A.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5], max_pixel_value=1.0),
+                ToTensorV2()
+            ], keypoint_params=A.KeypointParams(
+                format='xy',
+                remove_invisible=False,
+                label_fields=['keypoint_labels']
+            ))
+        else:
+            # No augmentation for val/test
+            return A.Compose([
+                # Normalize to [-1, 1] (matching old working project)
+                A.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5], max_pixel_value=1.0),
+                ToTensorV2()
+            ], keypoint_params=A.KeypointParams(
+                format='xy',
+                remove_invisible=False,
+                label_fields=['keypoint_labels']
+            ))
+    
+    def __call__(
+        self, 
+        image: np.ndarray, 
+        keypoints: List[List[float]],
+        keypoint_labels: Optional[List[int]] = None
+    ) -> Dict:
+        """Apply light augmentation."""
+        # Ensure image is in correct format
+        if image.dtype == np.float64:
+            image = image.astype(np.float32)
+        elif image.dtype == np.uint8:
+            image = image.astype(np.float32) / 255.0
+        
+        # Ensure 3 channels
+        if len(image.shape) == 2:
+            image = np.stack([image] * 3, axis=-1)
+        
+        # Create default labels if not provided
+        if keypoint_labels is None:
+            keypoint_labels = list(range(len(keypoints)))
+        
+        # Apply transform
+        transformed = self.transform(
+            image=image,
+            keypoints=keypoints,
+            keypoint_labels=keypoint_labels
+        )
+        
+        return {
+            'image': transformed['image'],
+            'keypoints': transformed['keypoints'],
+            'keypoint_labels': transformed.get('keypoint_labels', keypoint_labels)
+        }

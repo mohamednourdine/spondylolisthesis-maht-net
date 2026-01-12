@@ -276,38 +276,64 @@ class BaseTrainer(ABC):
             val_other = {k: v for k, v in val_metrics.items() if k != 'loss'}
             
             if train_other:
-                # Print MRE first
-                if 'MRE' in train_other:
+                # Print MRE (prefer mm if available, otherwise px)
+                if 'MRE_mm' in train_other:
+                    print(f"  Train MRE: {train_other['MRE_mm']:.2f} mm ({train_other.get('MRE_px', 0):.1f} px)")
+                elif 'MRE_px' in train_other:
+                    print(f"  Train MRE: {train_other['MRE_px']:.2f} px")
+                elif 'MRE' in train_other:  # Backward compatibility
                     print(f"  Train MRE: {train_other['MRE']:.2f}")
-                # Print SDR metrics
+                # Print SDR metrics in ascending order (2px, 4px, 8px, 16px)
                 sdr_metrics = {k: v for k, v in train_other.items() if 'SDR' in k}
                 if sdr_metrics:
-                    sdr_str = ', '.join([f"{k.replace('SDR_', '')}: {v:.4f}" for k, v in sorted(sdr_metrics.items())])
+                    # Sort by extracting numeric value from key (e.g., "SDR_2px" -> 2)
+                    def get_threshold_value(key):
+                        # Extract number from keys like "SDR_2px", "SDR_4px", etc.
+                        import re
+                        match = re.search(r'(\d+(?:\.\d+)?)', key)
+                        return float(match.group(1)) if match else float('inf')
+                    
+                    sorted_sdr = sorted(sdr_metrics.items(), key=lambda x: get_threshold_value(x[0]))
+                    sdr_str = ', '.join([f"{k.replace('SDR_', '')}: {v:.4f}" for k, v in sorted_sdr])
                     print(f"  Train SDR: {sdr_str}")
                 # Print any other metrics
-                other = {k: v for k, v in train_other.items() if k != 'MRE' and 'SDR' not in k}
+                other = {k: v for k, v in train_other.items() if k not in ['MRE', 'MRE_px', 'MRE_mm'] and 'SDR' not in k}
                 for key, value in other.items():
                     print(f"  Train {key}: {value:.4f}")
             
             if val_other:
-                # Print MRE first
-                if 'MRE' in val_other:
+                # Print MRE (prefer mm if available, otherwise px)
+                if 'MRE_mm' in val_other:
+                    print(f"  Val MRE:   {val_other['MRE_mm']:.2f} mm ({val_other.get('MRE_px', 0):.1f} px)")
+                elif 'MRE_px' in val_other:
+                    print(f"  Val MRE:   {val_other['MRE_px']:.2f} px")
+                elif 'MRE' in val_other:  # Backward compatibility
                     print(f"  Val MRE:   {val_other['MRE']:.2f}")
-                # Print SDR metrics
+                # Print SDR metrics in ascending order (2px, 4px, 8px, 16px)
                 sdr_metrics = {k: v for k, v in val_other.items() if 'SDR' in k}
                 if sdr_metrics:
-                    sdr_str = ', '.join([f"{k.replace('SDR_', '')}: {v:.4f}" for k, v in sorted(sdr_metrics.items())])
+                    # Sort by extracting numeric value from key (e.g., "SDR_2px" -> 2)
+                    import re
+                    def get_threshold_value(key):
+                        match = re.search(r'(\d+(?:\.\d+)?)', key)
+                        return float(match.group(1)) if match else float('inf')
+                    
+                    sorted_sdr = sorted(sdr_metrics.items(), key=lambda x: get_threshold_value(x[0]))
+                    sdr_str = ', '.join([f"{k.replace('SDR_', '')}: {v:.4f}" for k, v in sorted_sdr])
                     print(f"  Val SDR:   {sdr_str}")
                 # Print any other metrics
-                other = {k: v for k, v in val_other.items() if k != 'MRE' and 'SDR' not in k}
+                other = {k: v for k, v in val_other.items() if k not in ['MRE', 'MRE_px', 'MRE_mm'] and 'SDR' not in k}
                 for key, value in other.items():
                     print(f"  Val {key}: {value:.4f}")
             
-            # Save best model
+            # Save best model and check early stopping
             is_best = val_metrics['loss'] < self.best_val_loss
             if is_best:
                 self.best_val_loss = val_metrics['loss']
+                self.patience_counter = 0  # Reset patience counter
                 print(f"  ✓ New best model (val_loss: {val_metrics['loss']:.4f})")
+            else:
+                self.patience_counter += 1
             
             # Save checkpoint
             self.save_checkpoint(epoch, val_metrics, is_best=is_best)
@@ -316,8 +342,8 @@ class BaseTrainer(ABC):
             if (epoch + 1) % 10 == 0:
                 self.save_checkpoint(epoch, val_metrics, filename=f'checkpoint_epoch_{epoch+1}.pth')
             
-            # Early stopping
-            if self.should_stop_early(val_metrics['loss'], mode='min'):
+            # Early stopping check
+            if self.patience_counter >= self.patience:
                 print(f"\n⚠️  Early stopping triggered after {epoch+1} epochs")
                 print(f"   No improvement for {self.patience} epochs")
                 break

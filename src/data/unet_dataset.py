@@ -18,7 +18,8 @@ def generate_gaussian_heatmap(
     height: int,
     width: int,
     keypoint: np.ndarray,
-    sigma: float = 3.0
+    sigma: float = 3.0,
+    amplitude: float = 1000.0
 ) -> np.ndarray:
     """
     Generate a Gaussian heatmap for a single keypoint.
@@ -28,6 +29,7 @@ def generate_gaussian_heatmap(
         width: Heatmap width
         keypoint: Keypoint [x, y, visibility]
         sigma: Standard deviation of Gaussian
+        amplitude: Peak amplitude of the Gaussian (default: 1000.0 from working project)
         
     Returns:
         Heatmap array [H, W]
@@ -62,8 +64,8 @@ def generate_gaussian_heatmap(
     y_range = x_range[:, np.newaxis]
     x0 = y0 = size // 2
     
-    # The gaussian is not normalized, we want the center value to be 1
-    g = np.exp(-((x_range - x0) ** 2 + (y_range - y0) ** 2) / (2 * sigma ** 2))
+    # The gaussian peak is set to amplitude (not 1.0)
+    g = amplitude * np.exp(-((x_range - x0) ** 2 + (y_range - y0) ** 2) / (2 * sigma ** 2))
     
     # Usable gaussian range
     g_x = max(0, -ul[0]), min(br[0], width) - ul[0]
@@ -82,36 +84,60 @@ def generate_heatmaps_from_keypoints(
     keypoints: np.ndarray,
     image_height: int,
     image_width: int,
-    num_keypoint_types: int = 4,
-    sigma: float = 3.0
+    max_vertebrae: int = 10,
+    corners_per_vertebra: int = 4,
+    sigma: float = 3.0,
+    amplitude: float = 1000.0
 ) -> np.ndarray:
     """
-    Generate heatmaps from keypoint annotations.
+    Generate per-vertebra heatmaps from keypoint annotations.
     
     Args:
         keypoints: Array of shape [N, 4, 3] where N is number of vertebrae,
                    4 is corners per vertebra, 3 is [x, y, visibility]
         image_height: Target heatmap height
         image_width: Target heatmap width
-        num_keypoint_types: Number of keypoint types (4 for corners)
+        max_vertebrae: Maximum number of vertebrae (for padding)
+        corners_per_vertebra: Number of corners per vertebra (4)
         sigma: Gaussian sigma for heatmap generation
+        amplitude: Peak amplitude (default: 1000.0 from working project)
         
     Returns:
-        Heatmaps array [num_keypoint_types, H, W]
+        Heatmaps array [max_vertebrae * corners_per_vertebra, H, W]
+        Each vertebra has 4 consecutive channels for its corners.
     """
-    heatmaps = np.zeros((num_keypoint_types, image_height, image_width), dtype=np.float32)
+    num_channels = max_vertebrae * corners_per_vertebra
+    heatmaps = np.zeros((num_channels, image_height, image_width), dtype=np.float32)
     
-    # For each vertebra
-    for vertebra_kps in keypoints:
-        # For each corner (keypoint type)
-        for kp_idx in range(min(num_keypoint_types, len(vertebra_kps))):
-            keypoint = vertebra_kps[kp_idx]
+    # Sort vertebrae by Y-coordinate (top to bottom)
+    # Use center Y of each vertebra for sorting
+    vertebra_centers = []
+    for vert_idx, vertebra_kps in enumerate(keypoints):
+        # Get center Y from visible keypoints
+        visible_y = [kp[1] for kp in vertebra_kps if kp[2] > 0]
+        if visible_y:
+            center_y = np.mean(visible_y)
+            vertebra_centers.append((center_y, vert_idx))
+    
+    # Sort by Y position (top to bottom)
+    vertebra_centers.sort(key=lambda x: x[0])
+    
+    # Generate heatmaps for each sorted vertebra
+    for sorted_idx, (_, orig_idx) in enumerate(vertebra_centers):
+        if sorted_idx >= max_vertebrae:
+            break  # Skip if more vertebrae than max
+        
+        vertebra_kps = keypoints[orig_idx]
+        
+        # Generate heatmap for each corner of this vertebra
+        for corner_idx in range(corners_per_vertebra):
+            keypoint = vertebra_kps[corner_idx]
+            channel_idx = sorted_idx * corners_per_vertebra + corner_idx
             
-            # Generate and accumulate heatmap (take max for overlapping)
             heatmap = generate_gaussian_heatmap(
-                image_height, image_width, keypoint, sigma
+                image_height, image_width, keypoint, sigma, amplitude
             )
-            heatmaps[kp_idx] = np.maximum(heatmaps[kp_idx], heatmap)
+            heatmaps[channel_idx] = heatmap
     
     return heatmaps
 
@@ -132,8 +158,12 @@ class UNetSpondylolisthesisDataset(SpondylolisthesisDataset):
         preprocessor: Optional[ImagePreprocessor] = None,
         augmentation: Optional[SpondylolisthesisAugmentation] = None,
         heatmap_sigma: float = 3.0,
-        num_keypoint_types: int = 4,
+        heatmap_amplitude: float = 10.0,
+        max_vertebrae: int = 10,
+        corners_per_vertebra: int = 4,
         output_stride: int = 1,
+        target_size: Tuple[int, int] = (512, 512),
+        apply_clahe: bool = True,
         **kwargs
     ):
         """
@@ -144,10 +174,22 @@ class UNetSpondylolisthesisDataset(SpondylolisthesisDataset):
             preprocessor: ImagePreprocessor instance
             augmentation: SpondylolisthesisAugmentation instance
             heatmap_sigma: Sigma for Gaussian heatmap generation
-            num_keypoint_types: Number of keypoint types (4 for corners)
+            heatmap_amplitude: Amplitude for Gaussian heatmap generation (default: 10.0)
+            max_vertebrae: Maximum number of vertebrae per image (default: 10)
+            corners_per_vertebra: Number of corners per vertebra (default: 4)
             output_stride: Downsampling factor for heatmaps (1 = same size as image)
+            target_size: Image size (width, height) - default 512x512
+            apply_clahe: Whether to apply CLAHE contrast enhancement
             **kwargs: Additional arguments for parent class
         """
+        # Create preprocessor with custom size if not provided
+        if preprocessor is None:
+            preprocessor = ImagePreprocessor(
+                target_size=target_size,
+                normalize=True,
+                apply_clahe=apply_clahe and (mode == 'train')
+            )
+        
         super().__init__(
             image_dir=image_dir,
             label_dir=label_dir,
@@ -158,8 +200,11 @@ class UNetSpondylolisthesisDataset(SpondylolisthesisDataset):
         )
         
         self.heatmap_sigma = heatmap_sigma
-        self.num_keypoint_types = num_keypoint_types
+        self.heatmap_amplitude = heatmap_amplitude
+        self.max_vertebrae = max_vertebrae
+        self.corners_per_vertebra = corners_per_vertebra
         self.output_stride = output_stride
+        self.target_size = target_size
     
     def __getitem__(self, idx: int) -> Dict:
         """
@@ -201,8 +246,10 @@ class UNetSpondylolisthesisDataset(SpondylolisthesisDataset):
             scaled_keypoints,
             heatmap_h,
             heatmap_w,
-            self.num_keypoint_types,
-            self.heatmap_sigma
+            self.max_vertebrae,
+            self.corners_per_vertebra,
+            self.heatmap_sigma,
+            self.heatmap_amplitude
         )
         
         heatmaps_tensor = torch.from_numpy(heatmaps).float()
