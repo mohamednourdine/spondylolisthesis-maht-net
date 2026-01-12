@@ -22,6 +22,11 @@ class BaseConfig:
     VAL_IMAGE_DIR = DATA_ROOT / 'images' / 'val'
     VAL_LABEL_DIR = DATA_ROOT / 'labels' / 'val'
     
+    # Test data paths (for final evaluation)
+    TEST_ROOT = PROJECT_ROOT / 'data' / 'Test'
+    TEST_IMAGE_DIR = TEST_ROOT / 'images'
+    TEST_LABEL_DIR = TEST_ROOT / 'labels'
+    
     # Common hyperparameters
     BATCH_SIZE = 8  # Reduced to 8 for GPU memory efficiency (works on T4 15GB)
     NUM_WORKERS = 2  # Reduced for Google Colab compatibility
