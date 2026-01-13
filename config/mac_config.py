@@ -53,7 +53,13 @@ class MacConfig:
     NUM_KEYPOINTS = MAX_VERTEBRAE * CORNERS_PER_VERTEBRA  # 40 output channels
     BILINEAR = True  # Faster than transposed conv
     BASE_CHANNELS = 64  # Full size model (17.27M params)
+    
+    # Dropout configuration
+    # Option 1: Single dropout_rate (backwards compatible, applies at bottleneck)
     DROPOUT_RATE = 0.3  # Added to reduce overfitting
+    # Option 2: Per-layer dropout (like old project) - set to None to use DROPOUT_RATE
+    DOWN_DROPOUT = [0.2, 0.2, 0.3, 0.4]  # Encoder: progressively more dropout at deeper layers
+    UP_DROPOUT = [0.3, 0.2, 0.1, 0.0]    # Decoder: less dropout as we approach output
     
     # Heatmap settings - CRITICAL: Amplitude must match model output range!
     # Larger sigma = larger Gaussian peaks = easier for model to learn
@@ -77,12 +83,17 @@ class MacConfig:
     LEARNING_RATE = 0.0003  # Reduced from 0.001 to prevent overfitting
     WEIGHT_DECAY = 1e-4
     
-    # Loss function ('focal', 'adaptive_wing', 'combined', 'weighted_mse')
+    # Loss function ('focal', 'adaptive_wing', 'combined', 'weighted_mse', 'mse_peak')
     # weighted_mse: Simple and effective for heatmaps (RECOMMENDED FOR NOW)
+    # mse_peak: Combined MSE + Peak Loss - directly optimizes SDR (NEW!)
     # focal: CornerNet-style, good for object detection
     # adaptive_wing: Complex, needs careful parameter tuning for heatmaps
     # combined: AWing + MSE, more robust
     LOSS_FUNCTION = 'weighted_mse'
+    
+    # MSE + Peak Loss parameters (if using mse_peak)
+    MSE_WEIGHT = 0.7  # Weight for heatmap MSE loss
+    PEAK_WEIGHT = 0.3  # Weight for peak location loss (directly optimizes SDR)
     
     # Focal loss parameters (if using focal)
     FOCAL_ALPHA = 2.0

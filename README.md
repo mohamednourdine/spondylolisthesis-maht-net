@@ -336,6 +336,7 @@ All models are evaluated with comprehensive metrics during training:
 |--------|-------------|
 | `scripts/calculate_calibration.py` | Analyze vertebra dimensions |
 | `scripts/generate_augmented_data.py` | Generate augmented training data |
+| `scripts/cleanup_experiments.py` | Clean up old experiment results |
 
 ### Test Scripts
 

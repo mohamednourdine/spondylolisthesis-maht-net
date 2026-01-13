@@ -30,23 +30,25 @@ class DoubleConv(nn.Module):
 
 
 class Down(nn.Module):
-    """Downscaling with maxpool then double conv"""
+    """Downscaling with maxpool then double conv, with optional dropout"""
     
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, dropout_rate=0.0):
         super(Down, self).__init__()
-        self.maxpool_conv = nn.Sequential(
-            nn.MaxPool2d(2),
-            DoubleConv(in_channels, out_channels)
-        )
+        self.maxpool = nn.MaxPool2d(2)
+        self.conv = DoubleConv(in_channels, out_channels)
+        self.dropout = nn.Dropout2d(p=dropout_rate) if dropout_rate > 0 else None
     
     def forward(self, x):
-        return self.maxpool_conv(x)
+        x = self.maxpool(x)
+        if self.dropout is not None:
+            x = self.dropout(x)
+        return self.conv(x)
 
 
 class Up(nn.Module):
-    """Upscaling then double conv"""
+    """Upscaling then double conv, with optional dropout"""
     
-    def __init__(self, in_channels, out_channels, bilinear=True):
+    def __init__(self, in_channels, out_channels, bilinear=True, dropout_rate=0.0):
         super(Up, self).__init__()
         
         # Use bilinear upsampling or transposed convolution
@@ -56,6 +58,8 @@ class Up(nn.Module):
         else:
             self.up = nn.ConvTranspose2d(in_channels, in_channels // 2, kernel_size=2, stride=2)
             self.conv = DoubleConv(in_channels, out_channels)
+        
+        self.dropout = nn.Dropout2d(p=dropout_rate) if dropout_rate > 0 else None
     
     def forward(self, x1, x2):
         x1 = self.up(x1)
@@ -69,6 +73,10 @@ class Up(nn.Module):
         
         # Concatenate skip connection
         x = torch.cat([x2, x1], dim=1)
+        
+        if self.dropout is not None:
+            x = self.dropout(x)
+        
         return self.conv(x)
 
 
@@ -92,31 +100,44 @@ class UNet(nn.Module):
         num_keypoints: Number of keypoint types (4 for vertebra corners)
         bilinear: Use bilinear upsampling (True) or transposed convolutions (False)
         base_channels: Number of channels in first layer (default: 64)
+        dropout_rate: Single dropout rate (applied at bottleneck only, for backwards compat)
+        down_dropout: List of 4 dropout rates for encoder layers [down1, down2, down3, down4]
+        up_dropout: List of 4 dropout rates for decoder layers [up1, up2, up3, up4]
     """
     
-    def __init__(self, in_channels=3, num_keypoints=4, bilinear=False, base_channels=64, dropout_rate=0.0):
+    def __init__(self, in_channels=3, num_keypoints=4, bilinear=False, base_channels=64, 
+                 dropout_rate=0.0, down_dropout=None, up_dropout=None):
         super(UNet, self).__init__()
         self.in_channels = in_channels
         self.num_keypoints = num_keypoints
         self.bilinear = bilinear
-        self.dropout_rate = dropout_rate
+        
+        # Handle dropout configuration
+        # If per-layer dropout is specified, use it; otherwise fall back to single dropout_rate
+        if down_dropout is None:
+            down_dropout = [0.0, 0.0, 0.0, dropout_rate]  # Only bottleneck by default
+        if up_dropout is None:
+            up_dropout = [0.0, 0.0, 0.0, 0.0]
+        
+        assert len(down_dropout) == 4, "down_dropout must have 4 values"
+        assert len(up_dropout) == 4, "up_dropout must have 4 values"
+        
+        self.down_dropout = down_dropout
+        self.up_dropout = up_dropout
         
         # Encoder
         self.inc = DoubleConv(in_channels, base_channels)
-        self.down1 = Down(base_channels, base_channels * 2)
-        self.down2 = Down(base_channels * 2, base_channels * 4)
-        self.down3 = Down(base_channels * 4, base_channels * 8)
+        self.down1 = Down(base_channels, base_channels * 2, dropout_rate=down_dropout[0])
+        self.down2 = Down(base_channels * 2, base_channels * 4, dropout_rate=down_dropout[1])
+        self.down3 = Down(base_channels * 4, base_channels * 8, dropout_rate=down_dropout[2])
         factor = 2 if bilinear else 1
-        self.down4 = Down(base_channels * 8, base_channels * 16 // factor)
-        
-        # Dropout for regularization
-        self.dropout = nn.Dropout2d(p=dropout_rate) if dropout_rate > 0 else None
+        self.down4 = Down(base_channels * 8, base_channels * 16 // factor, dropout_rate=down_dropout[3])
         
         # Decoder
-        self.up1 = Up(base_channels * 16, base_channels * 8 // factor, bilinear)
-        self.up2 = Up(base_channels * 8, base_channels * 4 // factor, bilinear)
-        self.up3 = Up(base_channels * 4, base_channels * 2 // factor, bilinear)
-        self.up4 = Up(base_channels * 2, base_channels, bilinear)
+        self.up1 = Up(base_channels * 16, base_channels * 8 // factor, bilinear, dropout_rate=up_dropout[0])
+        self.up2 = Up(base_channels * 8, base_channels * 4 // factor, bilinear, dropout_rate=up_dropout[1])
+        self.up3 = Up(base_channels * 4, base_channels * 2 // factor, bilinear, dropout_rate=up_dropout[2])
+        self.up4 = Up(base_channels * 2, base_channels, bilinear, dropout_rate=up_dropout[3])
         
         # Output layer - one heatmap per keypoint type
         self.outc = OutConv(base_channels, num_keypoints)
@@ -129,10 +150,6 @@ class UNet(nn.Module):
         x4 = self.down3(x3)
         x5 = self.down4(x4)
         
-        # Apply dropout at bottleneck (most effective location)
-        if self.dropout is not None:
-            x5 = self.dropout(x5)
-        
         # Decoder with skip connections
         x = self.up1(x5, x4)
         x = self.up2(x, x3)
@@ -142,6 +159,44 @@ class UNet(nn.Module):
         # Output heatmaps
         logits = self.outc(x)
         return logits
+    
+    def predict_with_uncertainty(self, x, n_samples=10):
+        """
+        Monte Carlo Dropout for uncertainty estimation.
+        
+        Runs multiple forward passes with dropout enabled to estimate
+        prediction uncertainty. Useful for clinical deployment.
+        
+        Args:
+            x: Input image tensor [B, C, H, W]
+            n_samples: Number of MC samples (default: 10)
+            
+        Returns:
+            mean_heatmaps: Mean prediction [B, K, H, W]
+            std_heatmaps: Standard deviation (uncertainty) [B, K, H, W]
+            all_samples: All predictions [n_samples, B, K, H, W]
+        """
+        was_training = self.training
+        self.train()  # Enable dropout for MC sampling
+        
+        samples = []
+        with torch.no_grad():
+            for _ in range(n_samples):
+                heatmaps = self.forward(x)
+                samples.append(heatmaps)
+        
+        # Restore original training mode
+        if not was_training:
+            self.eval()
+        
+        # Stack samples: [n_samples, B, K, H, W]
+        all_samples = torch.stack(samples, dim=0)
+        
+        # Calculate mean and std across samples
+        mean_heatmaps = all_samples.mean(dim=0)
+        std_heatmaps = all_samples.std(dim=0)
+        
+        return mean_heatmaps, std_heatmaps, all_samples
     
     def predict_keypoints(self, x, threshold=0.5):
         """

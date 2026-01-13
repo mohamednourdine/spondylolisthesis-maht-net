@@ -23,7 +23,8 @@ from training.losses import (
     UNetKeypointLoss, 
     AdaptiveWingLoss, 
     CombinedKeypointLoss,
-    MSEWithWeightedBackground
+    MSEWithWeightedBackground,
+    MSEWithPeakLoss
 )
 from training.unet_trainer import UNetTrainer
 from evaluation.keypoint_evaluator import get_global_evaluator
@@ -181,20 +182,28 @@ def main():
     # Create model (smaller version)
     print("\n2. Creating model...")
     dropout_rate = getattr(config, 'DROPOUT_RATE', 0.0)
+    down_dropout = getattr(config, 'DOWN_DROPOUT', None)
+    up_dropout = getattr(config, 'UP_DROPOUT', None)
+    
     model = ModelRegistry.create(
         'unet',
         in_channels=config.IN_CHANNELS,
         num_keypoints=config.NUM_KEYPOINTS,
         bilinear=config.BILINEAR,
         base_channels=config.BASE_CHANNELS,
-        dropout_rate=dropout_rate
+        dropout_rate=dropout_rate,
+        down_dropout=down_dropout,
+        up_dropout=up_dropout
     )
     model = model.to(device)
     
     # Count parameters
     total_params = sum(p.numel() for p in model.parameters())
     print(f"   Model parameters: {total_params / 1e6:.2f}M")
-    if dropout_rate > 0:
+    if down_dropout is not None:
+        print(f"   Per-layer dropout (encoder): {down_dropout}")
+        print(f"   Per-layer dropout (decoder): {up_dropout}")
+    elif dropout_rate > 0:
         print(f"   Dropout rate: {dropout_rate}")
     
     # Create loss and optimizer
@@ -215,6 +224,15 @@ def main():
         criterion = CombinedKeypointLoss()
     elif loss_func == 'weighted_mse':
         criterion = MSEWithWeightedBackground()
+    elif loss_func == 'mse_peak':
+        # Combined MSE + Peak Loss - directly optimizes SDR
+        mse_weight = getattr(config, 'MSE_WEIGHT', 0.7)
+        peak_weight = getattr(config, 'PEAK_WEIGHT', 0.3)
+        criterion = MSEWithPeakLoss(
+            mse_weight=mse_weight,
+            peak_weight=peak_weight
+        )
+        print(f"   MSE weight: {mse_weight}, Peak weight: {peak_weight}")
     elif loss_func == 'focal':
         criterion = UNetKeypointLoss(
             use_focal=True,

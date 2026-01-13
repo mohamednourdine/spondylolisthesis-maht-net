@@ -262,3 +262,96 @@ class CombinedKeypointLoss(nn.Module):
         total_loss = self.awing_weight * awing_loss + self.mse_weight * mse_loss
         
         return total_loss
+
+
+class MSEWithPeakLoss(nn.Module):
+    """
+    Combined MSE + Peak Loss for heatmap-based landmark detection.
+    
+    From old project analysis:
+    - 70% MSE Loss: Maintains overall heatmap shape accuracy
+    - 30% Peak Loss: Directly penalizes distance between predicted and true peak locations
+    
+    This explicitly optimizes what SDR measures (landmark localization accuracy).
+    """
+    
+    def __init__(self, mse_weight=0.7, peak_weight=0.3, 
+                 background_weight=0.05, keypoint_weight=5.0):
+        """
+        Args:
+            mse_weight: Weight for MSE heatmap loss (default: 0.7)
+            peak_weight: Weight for peak location loss (default: 0.3)
+            background_weight: Weight for background pixels in MSE (default: 0.05)
+            keypoint_weight: Weight for keypoint regions in MSE (default: 5.0)
+        """
+        super(MSEWithPeakLoss, self).__init__()
+        self.mse_weight = mse_weight
+        self.peak_weight = peak_weight
+        self.background_weight = background_weight
+        self.keypoint_weight = keypoint_weight
+    
+    def _find_peak_locations(self, heatmaps):
+        """
+        Find peak (argmax) locations in heatmaps.
+        
+        Args:
+            heatmaps: [B, K, H, W] tensor
+            
+        Returns:
+            peak_coords: [B, K, 2] tensor with (y, x) coordinates
+        """
+        B, K, H, W = heatmaps.shape
+        
+        # Flatten spatial dimensions
+        flat_heatmaps = heatmaps.view(B, K, -1)  # [B, K, H*W]
+        
+        # Find argmax indices
+        max_indices = flat_heatmaps.argmax(dim=2)  # [B, K]
+        
+        # Convert to y, x coordinates
+        y_coords = max_indices // W  # Integer division for row
+        x_coords = max_indices % W   # Modulo for column
+        
+        # Stack to get [B, K, 2]
+        peak_coords = torch.stack([y_coords, x_coords], dim=2).float()
+        
+        return peak_coords
+    
+    def forward(self, pred_heatmaps, target_heatmaps):
+        """
+        Args:
+            pred_heatmaps: Predicted heatmaps [B, K, H, W] (raw values)
+            target_heatmaps: Target heatmaps [B, K, H, W]
+        
+        Returns:
+            Combined loss value
+        """
+        # === MSE Loss with weighted background ===
+        squared_error = (pred_heatmaps - target_heatmaps) ** 2
+        
+        # Create weight map
+        weights = torch.where(
+            target_heatmaps > 0.1,
+            torch.full_like(target_heatmaps, self.keypoint_weight),
+            torch.full_like(target_heatmaps, self.background_weight)
+        )
+        
+        mse_loss = (squared_error * weights).mean()
+        
+        # === Peak Location Loss ===
+        # Find peak locations in predictions and targets
+        pred_peaks = self._find_peak_locations(pred_heatmaps)   # [B, K, 2]
+        target_peaks = self._find_peak_locations(target_heatmaps)  # [B, K, 2]
+        
+        # Calculate Euclidean distance between predicted and target peaks
+        # Normalize by image size for scale invariance
+        H, W = pred_heatmaps.shape[2:]
+        norm_factor = torch.tensor([H, W], device=pred_heatmaps.device, dtype=torch.float32)
+        
+        peak_diff = (pred_peaks - target_peaks) / norm_factor
+        peak_loss = torch.sqrt((peak_diff ** 2).sum(dim=2) + 1e-6).mean()  # L2 distance
+        
+        # === Combined Loss ===
+        total_loss = self.mse_weight * mse_loss + self.peak_weight * peak_loss
+        
+        return total_loss

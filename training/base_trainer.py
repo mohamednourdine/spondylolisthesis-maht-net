@@ -77,6 +77,7 @@ class BaseTrainer(ABC):
         # Training state
         self.current_epoch = 0
         self.best_val_loss = float('inf')
+        self.best_val_mre = float('inf')  # Track best MRE for model selection
         self.best_val_metric = 0.0
         self.train_losses = []
         self.val_losses = []
@@ -148,6 +149,8 @@ class BaseTrainer(ABC):
             'val_losses': self.val_losses,
             'train_metrics': self.train_metrics,
             'val_metrics': self.val_metrics,
+            'best_val_mre': self.best_val_mre,
+            'best_val_loss': self.best_val_loss,
         }
         
         if self.scheduler is not None:
@@ -183,6 +186,8 @@ class BaseTrainer(ABC):
         self.val_losses = checkpoint.get('val_losses', [])
         self.train_metrics = checkpoint.get('train_metrics', [])
         self.val_metrics = checkpoint.get('val_metrics', [])
+        self.best_val_mre = checkpoint.get('best_val_mre', float('inf'))
+        self.best_val_loss = checkpoint.get('best_val_loss', float('inf'))
         
         print(f"Loaded checkpoint from epoch {self.current_epoch}")
     
@@ -332,12 +337,16 @@ class BaseTrainer(ABC):
                 for key, value in other.items():
                     print(f"  Val {key}: {value:.4f}")
             
-            # Save best model and check early stopping
-            is_best = val_metrics['loss'] < self.best_val_loss
+            # Save best model based on MRE (the metric we care about)
+            # Fall back to loss if MRE not available
+            current_mre = val_metrics.get('MRE_px', val_metrics.get('MRE', float('inf')))
+            is_best = current_mre < self.best_val_mre
+            
             if is_best:
-                self.best_val_loss = val_metrics['loss']
+                self.best_val_mre = current_mre
+                self.best_val_loss = val_metrics['loss']  # Also track loss
                 self.patience_counter = 0  # Reset patience counter
-                print(f"  ✓ New best model (val_loss: {val_metrics['loss']:.4f})")
+                print(f"  ✓ New best model (val_MRE: {current_mre:.2f} px, val_loss: {val_metrics['loss']:.4f})")
             else:
                 self.patience_counter += 1
             
