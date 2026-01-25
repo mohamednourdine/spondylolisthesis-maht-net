@@ -497,33 +497,33 @@ python scripts/compare_experiments.py --model unet
 
 ```
 spondylolisthesis-maht-net/
-├── config/                 # Configuration files
-│   ├── mac_config.py      # Mac training config
-│   └── base_config.py     # Base configuration
-├── data/                   # Dataset
-│   ├── Train/             # Training data (494 images)
-│   ├── Validation/        # Validation data (204 images)
-│   └── Test/              # Test data (16 images, no labels)
-├── evaluation/            # Evaluation metrics
+├── config/                     # Configuration files
+│   ├── mac_config.py           # Mac training config
+│   └── base_config.py          # Base configuration
+├── data/                       # Dataset
+│   ├── Train/                  # Training data (494 images)
+│   ├── Validation/             # Validation data (204 images)
+│   └── Test/                   # Test data (16 images, no labels)
+├── evaluation/                 # Evaluation metrics
 │   ├── keypoint_evaluator.py
 │   ├── metrics.py
 │   └── unet_metrics.py
-├── experiments/           # Training outputs
-│   ├── results/           # Model checkpoints & logs
-│   ├── visualizations/    # Prediction visualizations
-│   └── test_evaluation/   # Test set results
-├── models/                # Model architectures
-│   ├── unet.py           # UNet implementation
-│   └── maht_net.py       # MAHT-Net (planned)
-├── scripts/               # Utility scripts
-├── src/                   # Core source code
-│   ├── data/             # Data loading & augmentation
-│   └── utils/            # Helper functions
-├── tests/                 # Test scripts
-├── training/              # Training infrastructure
-│   ├── base_trainer.py   # Base trainer class
-│   ├── unet_trainer.py   # UNet trainer
-│   └── losses.py         # Loss functions
-├── train_mac.py          # Mac training entry point
-└── train.py              # Cloud training entry point
+├── experiments/                # Training outputs
+│   ├── results/                # Model checkpoints & logs
+│   ├── visualizations/         # Prediction visualizations
+│   └── test_evaluation/        # Test set results
+├── models/                     # Model architectures
+│   ├── unet.py                 # UNet implementation
+│   └── maht_net.py             # MAHT-Net (planned)
+├── scripts/                    # Utility scripts
+├── src/                        # Core source code
+│   ├── data/                   # Data loading & augmentation
+│   └── utils/                  # Helper functions
+├── tests/                      # Test scripts
+├── training/                   # Training infrastructure
+│   ├── base_trainer.py         # Base trainer class
+│   ├── unet_trainer.py         # UNet trainer
+│   └── losses.py               # Loss functions
+├── train_mac.py                # Mac training entry point
+└── train.py                    # Cloud training entry point
 ```
