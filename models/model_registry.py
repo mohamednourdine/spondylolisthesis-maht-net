@@ -53,11 +53,24 @@ class ModelRegistry:
 
 # Register models
 from .unet import create_unet
+from .resnet_heatmap import create_resnet_heatmap
 
 @ModelRegistry.register('unet')
 def create_unet_model(**kwargs):
     """Create UNet model."""
     return create_unet(**kwargs)
+
+
+@ModelRegistry.register('resnet')
+def create_resnet_model(**kwargs):
+    """Create ResNet-50 heatmap model."""
+    return create_resnet_heatmap(**kwargs)
+
+
+@ModelRegistry.register('resnet-heatmap')
+def create_resnet_heatmap_model(**kwargs):
+    """Create ResNet-50 heatmap model (alias)."""
+    return create_resnet_heatmap(**kwargs)
 
 
 # Placeholder registrations for future models
