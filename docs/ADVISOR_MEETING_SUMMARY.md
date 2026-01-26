@@ -10,8 +10,9 @@ This document summarizes the complete work done on the **Vertebral Landmark Dete
 ### Key Achievements
 - ✅ Complete data analysis and preprocessing pipeline
 - ✅ UNet baseline model trained and evaluated
-- ✅ **ResNet-50 model trained - 21.5% improvement over UNet!**
-- ✅ Best validation MRE: **51.06 px** (ResNet-50) | SDR@24px: **36.1%**
+- ✅ ResNet-50 model trained - 21.5% improvement over UNet
+- ✅ **HRNet-W32 model trained - BEST RESULTS!**
+- ✅ Best validation MRE: **43.85 px** (HRNet-W32) | SDR@24px: **43.65%**
 - ✅ Advanced features implemented (Per-layer Dropout, MC Dropout for uncertainty)
 - ✅ Full experiment management infrastructure
 
@@ -121,7 +122,7 @@ G(x, y) = amplitude × exp(-((x - x₀)² + (y - y₀)²) / (2 × sigma²))
 
 ### 3.2 Model Architectures
 
-We implemented two architectures for comparison:
+We implemented three architectures for comparison:
 
 #### 3.2.1 UNet (Baseline)
 
@@ -182,25 +183,63 @@ Input Image (512×512×3)
 Output Heatmaps (512×512×40)
 ```
 
+#### 3.2.3 HRNet-W32 (High-Resolution Network) 🏆
+
+HRNet maintains high-resolution representations throughout the network with parallel multi-scale branches:
+
+```
+Input Image (512×512×3)
+        ↓
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    HRNet-W32 Backbone (ImageNet Pretrained via timm)     │
+│                                                                          │
+│  Stem: Conv → BN → ReLU → Conv → BN → ReLU (64ch, 256×256)             │
+│                                                                          │
+│              Stage 1      Stage 2       Stage 3      Stage 4            │
+│          ┌─ [1/4, 32ch] ─ [1/4, 32ch] ─ [1/4, 32ch] ─ [1/4, 32ch] ─┐   │
+│          │                    ↕            ↕ ↕          ↕ ↕ ↕       │   │
+│          │       ┌────────  [1/8, 64ch] ─ [1/8, 64ch] ─ [1/8, 64ch]─┤   │
+│          │       │                  ↕       ↕ ↕          ↕ ↕ ↕      │   │
+│          │       │        ┌───── [1/16,128ch] ────── [1/16,128ch]──┤   │
+│          │       │        │                  ↕          ↕ ↕        │   │
+│          │       │        │         ┌──── [1/32,256ch] ────────────┘   │
+│          └───────┴────────┴─────────┴──────────────────────────────────┘
+│                                                                          │
+│  Legend: ↕ = Cross-resolution feature fusion at every stage            │
+│  Key: Maintains HIGH RESOLUTION (1/4) throughout entire network         │
+└─────────────────────────────────────────────────────────────────────────┘
+        ↓
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    Simple Heatmap Head (0.90M params)                    │
+│                                                                          │
+│  Use Stage 1 features: 128×128×128 (highest resolution branch)          │
+│  Conv2d: 128 → 64 (3×3, BN, ReLU)                                       │
+│  Conv2d: 64 → 40 (1×1)                                                  │
+│  Bilinear Upsample: 128×128 → 512×512                                   │
+└─────────────────────────────────────────────────────────────────────────┘
+        ↓
+Output Heatmaps (512×512×40)
+```
+
+**Why HRNet Works Best:**
+1. **Parallel multi-resolution branches** - no information loss from sequential downsampling
+2. **Repeated cross-scale fusion** - information exchange between resolutions at every stage
+3. **High-resolution output** - uses 1/4 resolution features (128×128), not bottleneck features
+4. **Proven for keypoints** - SOTA on COCO pose estimation
+
 #### Architecture Comparison
 
-| Component | UNet | ResNet-50 |
-|-----------|------|----------|
-| **Backbone Parameters** | N/A | 25.56M (ImageNet pretrained) |
-| **Decoder Parameters** | ~17M | 12.59M |
-| **Total Parameters** | 17.27M | 38.15M |
-| **Pretrained Weights** | ❌ No | ✅ ImageNet (IMAGENET1K_V2) |
-| **Frozen Layers** | None | conv1, bn1, layer1 (0.23M) |
-| **Trainable Parameters** | 17.27M | 37.93M |
-| **Architecture** | UNet with skip connections |
-| **Total Parameters** | ~17.27M |
-| **Input Size** | 512 × 512 × 3 (RGB, 3 channels for pretrained weight compatibility) |
-| **Output Size** | 512 × 512 × 40 (40 heatmaps) |
-| **Output Channels** | 10 vertebrae × 4 corners = 40 |
-| **Base Channels** | 64 (doubles at each encoder level) |
-| **Upsampling** | Bilinear (faster than transposed conv) |
-| **Normalization** | BatchNorm after each Conv layer |
-| **Activation** | ReLU (no final activation - raw heatmaps) |
+| Component | UNet | ResNet-50 | HRNet-W32 |
+|-----------|------|----------|------------|
+| **Backbone Parameters** | N/A | 25.56M | 30.88M |
+| **Decoder/Head Parameters** | ~17M | 12.59M | 0.90M |
+| **Total Parameters** | 17.27M | 38.15M | 31.78M |
+| **Pretrained Weights** | ❌ No | ✅ ImageNet | ✅ ImageNet |
+| **Frozen Layers** | None | conv1, bn1, layer1 | None |
+| **Architecture Type** | Encoder-Decoder | Encoder + Deconv | Parallel Multi-Scale |
+| **Resolution Strategy** | Downsample → Upsample | Downsample → Upsample | High-res maintained |
+| **Input Size** | 512 × 512 × 3 | 512 × 512 × 3 | 512 × 512 × 3 |
+| **Output Size** | 512 × 512 × 40 | 512 × 512 × 40 | 512 × 512 × 40 |
 
 #### Per-Layer Dropout Configuration
 
@@ -243,7 +282,21 @@ We implement **per-layer dropout** to provide graduated regularization:
 | **Early Stopping** | 15 epochs patience | More patience for transfer learning |
 | **Layer Freezing** | conv1, bn1, layer1 | Preserve low-level features |
 
-#### Common Configuration (Both Models)
+#### HRNet-W32 Training Configuration
+
+| Hyperparameter | Value | Rationale |
+|----------------|-------|-----------|
+| **Optimizer** | AdamW | Better weight decay handling |
+| **Backbone LR** | 0.00001 | Slow fine-tuning of pretrained weights |
+| **Head LR** | 0.0001 | Faster learning for new layers |
+| **Weight Decay** | 1e-4 | L2 regularization |
+| **Batch Size** | 4 | Larger batch with smaller head |
+| **Scheduler** | Cosine Annealing | Smooth LR decay to near zero |
+| **Warmup Epochs** | 5 | Gradual LR increase at start |
+| **Layer Freezing** | None | All layers trainable |
+| **Dropout** | 0.3 | In heatmap head only |
+
+#### Common Configuration (All Models)
 
 | Hyperparameter | Value | Rationale |
 |----------------|-------|-----------|
@@ -296,38 +349,38 @@ loss = mean(squared_error × weights)
 
 ### 4.1 Training Summary
 
-| Metric | UNet | ResNet-50 |
-|--------|------|----------|
-| **Total Epochs** | 86 | 100 |
-| **Best Epoch (MRE)** | 76 | 86 |
-| **Training Time** | 5.86 hours | 7.90 hours |
-| **Device** | Apple M-series (MPS) | Apple M-series (MPS) |
-| **Convergence** | Early stopped | Completed all epochs |
+| Metric | UNet | ResNet-50 | HRNet-W32 |
+|--------|------|----------|------------|
+| **Total Epochs** | 86 | 100 | 100 |
+| **Best Epoch (MRE)** | 76 | 86 | 87 |
+| **Training Time** | 5.86 hours | 7.90 hours | 4.71 hours |
+| **Device** | Apple M-series (MPS) | Apple M-series (MPS) | Apple M-series (MPS) |
+| **Convergence** | Early stopped | Completed all epochs | Completed all epochs |
 
 ### 4.2 Best Model Performance
 
-#### Model Comparison: UNet vs ResNet-50
+#### Model Comparison: UNet vs ResNet-50 vs HRNet-W32
 
-| Metric | UNet (Baseline) | ResNet-50 | Improvement |
-|--------|-----------------|-----------|-------------|
-| **Val MRE** | 65.07 px | **51.06 px** | ✅ **-14 px (21.5%)** |
-| **Val SDR@6px** | 17.8% | 18.3% | +0.5% |
-| **Val SDR@12px** | 26.8% | 31.9% | +5.1% |
-| **Val SDR@18px** | 29.3% | 34.9% | +5.6% |
-| **Val SDR@24px** | 29.7% | **36.1%** | ✅ **+6.4%** |
-| Best Epoch | 76 | 86 | - |
-| Training Time | 5.86 hrs | 7.90 hrs | +35% |
-| Parameters | 17.27M | 38.15M | 2.2× more |
+| Metric | UNet | ResNet-50 | HRNet-W32 🏆 | Best Improvement |
+|--------|------|----------|------------|------------------|
+| **Val MRE** | 65.07 px | 51.06 px | **43.85 px** | ✅ **-32.6%** (vs UNet) |
+| **Val SDR@6px** | 17.8% | 18.3% | **26.14%** | +8.3% |
+| **Val SDR@12px** | 26.8% | 31.9% | **38.82%** | +12.0% |
+| **Val SDR@18px** | 29.3% | 34.9% | **42.28%** | +13.0% |
+| **Val SDR@24px** | 29.7% | 36.1% | **43.65%** | ✅ **+14.0%** |
+| Best Epoch | 76 | 86 | 87 | - |
+| Training Time | 5.86 hrs | 7.90 hrs | **4.71 hrs** | Fastest |
+| Parameters | 17.27M | 38.15M | 31.78M | - |
 
-**Key Finding**: ImageNet pretrained weights significantly improved accuracy!
+**Key Finding**: HRNet-W32 achieves the best results across all metrics!
 
 ![Model Comparison](figures/model_comparison_bar.png)
-*Figure: Side-by-side comparison of UNet and ResNet-50 metrics*
+*Figure: Side-by-side comparison of all three models*
 
 **Interpretation:**
-- **MRE = 51 px (ResNet)**: 14 pixels better than UNet baseline
-- **SDR@24px = 36.1%**: 6.4 percentage points improvement
-- **Gap Analysis**: MRE still needs to improve by ~2.5× to reach clinical utility (<20 px)
+- **MRE = 43.85 px (HRNet)**: 21 pixels better than UNet, 7 pixels better than ResNet
+- **SDR@24px = 43.65%**: 14 percentage points improvement over UNet
+- **High-resolution features**: HRNet's parallel branches preserve spatial precision
 
 ### 4.3 Training Dynamics
 
@@ -352,26 +405,46 @@ Epoch   Train Loss   Val Loss    Val MRE    Val SDR@24px   LR
  86*      0.275       0.386       51.06 px    36.1%       1e-6     ← Best MRE
 100       0.272       0.456       55.61 px    31.6%       1e-6     ← End
 ```
+
+#### HRNet-W32 Training Progression (NEW)
+```
+Epoch   Train Loss   Val Loss    Val MRE    Val SDR@24px   LR
+--------------------------------------------------------------
+  1       0.939       1.009      280.4 px      0.2%       1e-4/1e-5
+ 25       0.337       0.418       51.2 px     38.8%       ~5e-5
+ 50       0.284       0.389       45.8 px     41.2%       ~1e-5
+ 87*      0.232       0.375       43.85 px    43.65%      ~1e-6    ← Best MRE 🏆
+100       0.252       0.379       44.19 px    43.08%      ~0       ← End
+```
 *Approximate values - see full training logs for exact numbers*
 
-**Key Observation**: ResNet-50's best validation loss (epoch 39) was earlier than best MRE (epoch 86), indicating that loss is not perfectly correlated with localization accuracy.
+**Key Observation**: HRNet-W32 achieves the best MRE (43.85 px) at epoch 87, with smooth convergence thanks to cosine annealing scheduler.
 
 #### Training Curves Visualization
 
-![Training Curves Comparison](figures/training_curves_comparison.png)
-*Figure: Validation MRE and SDR@24px over training epochs for both models*
+##### All Models Comparison
 
-![Training Details](figures/training_details.png)
-*Figure: Detailed training metrics including loss curves and SDR at different thresholds*
+![Training Curves All Models](figures/training_curves_all_models.png)
+*Figure: Training curves comparison for all three models - MRE, SDR@24px, and Loss over epochs*
+
+##### HRNet-W32 Detailed Training Curves
+
+![HRNet Training Curves](figures/hrnet_training_curves.png)
+*Figure: HRNet-W32 detailed training curves showing MRE, SDR, Loss, and generalization gap*
+
+##### Final Performance Comparison
+
+![Model Comparison Bar](figures/model_comparison_bar.png)
+*Figure: Final best performance comparison - HRNet-W32 achieves lowest MRE and highest SDR@24px*
 
 ### 4.4 Test Set Evaluation
 
-| Metric | UNet | ResNet-50 |
-|--------|------|----------|
-| **Test Images** | 16 | 16 |
-| **Vertebrae Detected** | 160 | 160 |
-| **Detection Rate** | 100% | 100% |
-| **Results Location** | `experiments/test_evaluation/unet/` | `experiments/test_evaluation/resnet/` |
+| Metric | UNet | ResNet-50 | HRNet-W32 |
+|--------|------|----------|------------|
+| **Test Images** | 16 | 16 | 16 |
+| **Vertebrae Detected** | 160 | 160 | 160 |
+| **Detection Rate** | 100% | 100% | 100% |
+| **Results Location** | `experiments/test_evaluation/unet/` | `experiments/test_evaluation/resnet/` | `experiments/test_evaluation/` |
 
 *Note: Test set has no ground truth labels - evaluation is qualitative via visualizations*
 
@@ -382,6 +455,7 @@ The following visualizations were created for the test set:
 - **Heatmap visualizations**: Per-channel heatmap outputs
 - **UNet results**: `experiments/test_evaluation/unet/visualizations/`
 - **ResNet results**: `experiments/test_evaluation/resnet/visualizations/`
+- **HRNet results**: `experiments/test_evaluation/visualizations/`
 
 #### Sample UNet Predictions on Test Set
 
@@ -407,14 +481,26 @@ The following visualizations were created for the test set:
 | ![ResNet 4](figures/resnet_predictions/3836-F-020Y1_prediction.png) | ![ResNet 5](figures/resnet_predictions/3870-F-060Y1_prediction.png) | ![ResNet 6](figures/resnet_predictions/4093-F-083Y1_prediction.png) |
 | 3836-F-020Y1 | 3870-F-060Y1 | 4093-F-083Y1 |
 
+#### Sample HRNet-W32 Predictions on Test Set 🏆
+
+| Sample 1 | Sample 2 | Sample 3 |
+|:--------:|:--------:|:--------:|
+| ![HRNet 1](figures/hrnet_predictions/3729-F-067Y1_prediction.png) | ![HRNet 2](figures/hrnet_predictions/3753-F-049Y1_prediction.png) | ![HRNet 3](figures/hrnet_predictions/3808-F-065Y1_prediction.png) |
+| 3729-F-067Y1 | 3753-F-049Y1 | 3808-F-065Y1 |
+
+| Sample 4 | Sample 5 | Sample 6 |
+|:--------:|:--------:|:--------:|
+| ![HRNet 4](figures/hrnet_predictions/3836-F-020Y1_prediction.png) | ![HRNet 5](figures/hrnet_predictions/3870-F-060Y1_prediction.png) | ![HRNet 6](figures/hrnet_predictions/4093-F-083Y1_prediction.png) |
+| 3836-F-020Y1 | 3870-F-060Y1 | 4093-F-083Y1 |
+
 #### Side-by-Side Comparison (Same Test Image)
 
-| UNet (MRE: 65.07 px) | ResNet-50 (MRE: 51.06 px) |
-|:--------------------:|:-------------------------:|
-| ![UNet](figures/unet_predictions/3729-F-067Y1_prediction.png) | ![ResNet](figures/resnet_predictions/3729-F-067Y1_prediction.png) |
-| **3729-F-067Y1** | **3729-F-067Y1** |
-| ![UNet](figures/unet_predictions/3836-F-020Y1_prediction.png) | ![ResNet](figures/resnet_predictions/3836-F-020Y1_prediction.png) |
-| **3836-F-020Y1** | **3836-F-020Y1** |
+| UNet (MRE: 65.07 px) | ResNet-50 (MRE: 51.06 px) | HRNet-W32 (MRE: 43.85 px) 🏆 |
+|:--------------------:|:-------------------------:|:---------------------------:|
+| ![UNet](figures/unet_predictions/3729-F-067Y1_prediction.png) | ![ResNet](figures/resnet_predictions/3729-F-067Y1_prediction.png) | ![HRNet](figures/hrnet_predictions/3729-F-067Y1_prediction.png) |
+| **3729-F-067Y1** | **3729-F-067Y1** | **3729-F-067Y1** |
+| ![UNet](figures/unet_predictions/3836-F-020Y1_prediction.png) | ![ResNet](figures/resnet_predictions/3836-F-020Y1_prediction.png) | ![HRNet](figures/hrnet_predictions/3836-F-020Y1_prediction.png) |
+| **3836-F-020Y1** | **3836-F-020Y1** | **3836-F-020Y1** |
 
 *Note: These are predictions on the held-out test set (no ground truth available). Each image shows detected vertebra corners: TL (red), TR (green), BL (blue), BR (yellow).*
 
@@ -429,7 +515,8 @@ spondylolisthesis-maht-net/
 │   └── mac_config.py      # Training hyperparameters
 ├── models/                 # Model architectures
 │   ├── unet.py            # UNet with per-layer dropout
-│   ├── resnet_heatmap.py  # ResNet-50 + Simple Decoder (NEW)
+│   ├── resnet_heatmap.py  # ResNet-50 + Simple Decoder
+│   ├── hrnet_heatmap.py   # HRNet-W32 + Heatmap Head (NEW) 🏆
 │   └── model_registry.py  # Model factory registry
 ├── training/              # Training infrastructure
 │   ├── base_trainer.py    # Abstract trainer with early stopping
@@ -442,15 +529,18 @@ spondylolisthesis-maht-net/
 ├── evaluation/            # Metrics and evaluation
 │   └── keypoint_evaluator.py
 ├── scripts/               # Utility scripts
-│   ├── evaluate_test.py   # Test set evaluation (supports UNet & ResNet)
-│   ├── train_resnet.py    # ResNet training script (NEW)
+│   ├── evaluate_test.py   # Test set evaluation (supports UNet, ResNet, HRNet)
+│   ├── train_resnet.py    # ResNet training script
+│   ├── train_hrnet.py     # HRNet training script (NEW)
 │   └── cleanup_experiments.py
 ├── experiments/           # Saved models and logs
 │   └── results/
 │       ├── unet/          # UNet experiment results
-│       └── resnet/        # ResNet experiment results (NEW)
+│       ├── resnet/        # ResNet experiment results
+│       └── hrnet/         # HRNet experiment results (NEW)
 └── docs/                  # Documentation
-    └── RESNET50_IMPLEMENTATION_PLAN.md  # ResNet implementation guide (NEW)
+    ├── RESNET50_IMPLEMENTATION_PLAN.md  # ResNet implementation guide
+    └── HRNET_IMPLEMENTATION_PLAN.md     # HRNet implementation guide (NEW)
 ```
 
 ### 5.2 Key Features Implemented
@@ -461,11 +551,13 @@ spondylolisthesis-maht-net/
 | **MRE-based Model Selection** | Save best model by MRE, not loss | `training/base_trainer.py` |
 | **Early Stopping** | Stop after patience epochs without MRE improvement | `training/base_trainer.py` |
 | **Per-layer Dropout** | Different dropout rates per encoder/decoder layer | `models/unet.py` |
-| **MC Dropout** | Monte Carlo dropout for uncertainty estimation | `models/unet.py`, `models/resnet_heatmap.py` |
+| **MC Dropout** | Monte Carlo dropout for uncertainty estimation | `models/unet.py`, `models/resnet_heatmap.py`, `models/hrnet_heatmap.py` |
 | **Weighted MSE Loss** | De-emphasize background, focus on keypoints | `training/losses.py` |
-| **Pretrained Backbone** | ResNet-50 with ImageNet weights | `models/resnet_heatmap.py` |
-| **Differential Learning Rates** | Different LR for backbone vs decoder | `train_resnet.py` |
+| **Pretrained Backbone** | ResNet-50/HRNet-W32 with ImageNet weights | `models/resnet_heatmap.py`, `models/hrnet_heatmap.py` |
+| **Differential Learning Rates** | Different LR for backbone vs head | `train_resnet.py`, `train_hrnet.py` |
 | **Layer Freezing** | Freeze early backbone layers | `models/resnet_heatmap.py` |
+| **Cosine Annealing** | Smooth LR decay with warmup | `train_hrnet.py` |
+| **HRNet Multi-Scale** | Parallel high-resolution branches | `models/hrnet_heatmap.py` |
 | **Model Registry** | Factory pattern for model creation | `models/model_registry.py` |
 
 ---
@@ -492,32 +584,33 @@ SDR@T = (# landmarks with error < T) / (total landmarks) × 100%
 
 ## 7. Challenges & Observations
 
-### 7.1 Current Status After ResNet-50
+### 7.1 Current Status After HRNet-W32
 
-| Challenge | Previous (UNet) | Current (ResNet-50) | Status |
-|-----------|-----------------|---------------------|--------|
-| **High MRE** | 65.07 px | **51.06 px** | ✅ Improved 21.5% |
-| **Low SDR@24px** | 29.7% | **36.1%** | ✅ Improved 6.4% |
-| **No pretrained weights** | ❌ | ✅ ImageNet | ✅ Resolved |
-| **No test labels** | ❌ | ❌ | ⚠️ Still an issue |
-| **Variable image quality** | ⚠️ | ⚠️ | ⚠️ Needs augmentation |
+| Challenge | UNet | ResNet-50 | HRNet-W32 | Status |
+|-----------|------|-----------|-----------|--------|
+| **High MRE** | 65.07 px | 51.06 px | **43.85 px** | ✅ Improved 32.6% |
+| **Low SDR@24px** | 29.7% | 36.1% | **43.65%** | ✅ Improved 14% |
+| **No pretrained weights** | ❌ | ✅ | ✅ | ✅ Resolved |
+| **No test labels** | ❌ | ❌ | ❌ | ⚠️ Still an issue |
+| **Variable image quality** | ⚠️ | ⚠️ | ⚠️ | ⚠️ Needs augmentation |
 
 ### 7.2 Remaining Challenges
 
 | Challenge | Impact | Potential Solution |
 |-----------|--------|-------------------|
-| **MRE still >50 px** | Not clinical-ready | HRNet, attention mechanisms, MAHT-Net |
-| **SDR@24px ~36%** | 64% landmarks off by >24px | Multi-scale features, larger model |
+| **MRE still >40 px** | Not clinical-ready | Attention mechanisms, MAHT-Net |
+| **SDR@24px ~44%** | 56% landmarks off by >24px | Multi-scale fusion, larger model |
 | **No test labels** | Cannot quantify test accuracy | Request labels or cross-validate |
-| **Training time** | 8+ hours per experiment | Reduce epochs, use early stopping |
+| **Training time** | ~5 hours per experiment | Already optimized with HRNet |
 
-### 7.3 What Worked (ResNet-50 Success Factors)
+### 7.3 What Worked (HRNet-W32 Success Factors)
 
-1. **ImageNet Pretrained Weights**: Provided strong low-level feature extraction
-2. **Differential Learning Rates**: Allowed fine-tuning without destroying pretrained features
-3. **Layer Freezing**: Preserved early layer features, prevented overfitting
-4. **Simple Decoder**: Proved sufficient (no need for complex FPN yet)
-5. **Same Loss/Augmentation**: Fair comparison isolated pretrained weights as the variable
+1. **High-Resolution Representations**: Parallel branches maintain spatial precision
+2. **Multi-Scale Feature Fusion**: Cross-resolution exchange at every stage
+3. **ImageNet Pretrained Weights**: Strong initialization via timm library
+4. **Differential Learning Rates**: backbone_lr=1e-5, head_lr=1e-4
+5. **Cosine Annealing Scheduler**: Smooth LR decay with 5-epoch warmup
+6. **Simple Heatmap Head**: Uses Stage 1 features (128ch, 1/4 resolution)
 
 ---
 
@@ -623,6 +716,7 @@ Implement the Multi-scale Attention Hybrid Transformer Network with:
 | **Branch** | `main` |
 | **Best UNet Model** | `experiments/results/unet/unet_20260113_125631/best_model.pth` |
 | **Best ResNet Model** | `experiments/results/resnet/resnet50_pretrained_20260125_223141/best_model_mre.pth` |
+| **Best HRNet Model** | `experiments/results/hrnet/hrnet_w32_pretrained_ss_20260126_123737/best_model.pth` 🏆 |
 
 ### Key Commits
 1. `e40fb75` - Initial commit (project setup)
@@ -631,7 +725,8 @@ Implement the Multi-scale Attention Hybrid Transformer Network with:
 4. `265be01` - UNet implementation complete
 5. `27e4327` - UNet baseline trained (MRE 65.07px)
 6. `12a2ad7` - Advanced features added (MC Dropout, Per-layer Dropout)
-7. `5ea4ebf` - **ResNet-50 implementation complete** (MRE 51.06px)
+7. `5ea4ebf` - ResNet-50 implementation complete (MRE 51.06px)
+8. `TBD` - **HRNet-W32 implementation complete** (MRE 43.85px) 🏆
 
 ---
 
@@ -642,12 +737,13 @@ Implement the Multi-scale Attention Hybrid Transformer Network with:
 | **Dataset Analysis** | ✅ Complete | 716 images (700 train, 16 test) |
 | **Preprocessing** | ✅ Complete | Resize to 512×512, normalize, light augmentation |
 | **UNet Baseline** | ✅ Complete | 17.27M params, MRE 65.07 px, SDR@24px 29.7% |
-| **ResNet-50** | ✅ Complete | 38.15M params, **MRE 51.06 px**, SDR@24px 36.1% |
+| **ResNet-50** | ✅ Complete | 38.15M params, MRE 51.06 px, SDR@24px 36.1% |
+| **HRNet-W32** | ✅ Complete | 31.78M params, **MRE 43.85 px**, SDR@24px 43.65% 🏆 |
 | **Loss Function** | ✅ Complete | Weighted MSE (background=0.05, keypoint=5.0) |
-| **Regularization** | ✅ Complete | Per-layer dropout, layer freezing |
+| **Regularization** | ✅ Complete | Per-layer dropout, differential LR |
 | **Training Pipeline** | ✅ Complete | MRE-based model selection, early stopping |
-| **Best Val MRE** | ⚠️ 51.06 px | Target: <20 px (ResNet-50 best) |
-| **Best Val SDR@24px** | ⚠️ 36.1% | Target: >90% (ResNet-50 best) |
+| **Best Val MRE** | ⚠️ 43.85 px | Target: <20 px (HRNet-W32 best) |
+| **Best Val SDR@24px** | ⚠️ 43.65% | Target: >90% (HRNet-W32 best) |
 | **Test Evaluation** | ✅ Complete | 16 images, 160 vertebrae detected |
 | **Advanced Features** | ✅ Implemented | MC Dropout ready for uncertainty |
 
@@ -655,18 +751,18 @@ Implement the Multi-scale Attention Hybrid Transformer Network with:
 
 ## 12. Questions for Discussion
 
-1. **ResNet-50 improved MRE by 21.5% - is this sufficient progress, or should we try HRNet before MAHT-Net?**
+1. **HRNet-W32 achieved 43.85 px MRE (32.6% better than UNet) - ready to proceed with MAHT-Net?**
 
-2. **Should we focus on this dataset (no baselines) or switch to BUU-LSPINE (established benchmark)?**
+2. **Should we try the HRNet multi-scale variant for potentially better results before MAHT-Net?**
 
-3. **Priority check: HRNet implementation vs. starting MAHT-Net directly?**
+3. **Should we focus on this dataset (no baselines) or switch to BUU-LSPINE (established benchmark)?**
 
-4. **The gap between best-loss epoch (39) and best-MRE epoch (86) suggests loss isn't optimal for model selection - should we use a different loss function?**
+4. **The MRE is still ~44 px - what architectural changes would most likely close the gap to clinical utility (<20 px)?**
 
 5. **Timeline expectations for MAHT-Net implementation given current progress?**
 
 ---
 
 *Document generated: January 26, 2026*
-*Last updated: January 26, 2026 (ResNet-50 results added)*
+*Last updated: January 26, 2026 (HRNet-W32 results added)*
 *Project: spondylolisthesis-maht-net*

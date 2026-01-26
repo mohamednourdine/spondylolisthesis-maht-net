@@ -6,16 +6,18 @@ This project implements and benchmarks four models: **U-Net**, **ResNet Keypoint
 
 ---
 
-## 🎯 Current Results (UNet Baseline)
+## 🎯 Current Results
 
-| Metric | Value | Description |
-|--------|-------|-------------|
-| **Val MRE** | 66-71 px | Mean Radial Error |
-| **Val MSE** | ~7,000 px² | Mean Squared Error |
-| **SDR@6px** | 18.2% | Success Detection Rate |
-| **SDR@12px** | 25.8% | Success Detection Rate |
-| **SDR@18px** | 27.6% | Success Detection Rate |
-| **SDR@24px** | 28.2% | Success Detection Rate |
+### Best Model: HRNet-W32 🏆
+
+| Metric | HRNet-W32 | ResNet-50 | UNet |
+|--------|-----------|-----------|------|
+| **Val MRE** | **43.85 px** | 51.06 px | 48.41 px |
+| **Val SDR@24px** | **43.65%** | 36.1% | 38.0% |
+| Val SDR@18px | 42.28% | - | 36.4% |
+| Val SDR@12px | 38.82% | - | 31.9% |
+| Val SDR@6px | 26.14% | - | 19.5% |
+| Parameters | 31.78M | 30.79M | 8.65M |
 
 *Trained on 494 images, validated on 204 images, tested on 16 images*
 
@@ -281,21 +283,22 @@ All models are evaluated with comprehensive metrics during training:
 
 | Metric | Train | Validation | Test |
 |--------|-------|------------|------|
-| **MRE** | 85 px | 66-71 px | N/A* |
-| **MSE** | 11,480 px² | 7,000 px² | N/A* |
-| **SDR@6px** | 12.0% | 18.2% | N/A* |
-| **SDR@12px** | 18.9% | 25.8% | N/A* |
-| **SDR@18px** | 20.6% | 27.6% | N/A* |
-| **SDR@24px** | 21.2% | 28.2% | N/A* |
+| **MRE** | ~45 px | 48.41 px | N/A* |
+| **MSE** | ~4,500 px² | ~4,500 px² | N/A* |
+| **SDR@6px** | ~22% | 19.5% | N/A* |
+| **SDR@12px** | ~28% | 31.9% | N/A* |
+| **SDR@18px** | ~32% | 36.4% | N/A* |
+| **SDR@24px** | ~35% | 38.0% | N/A* |
 
 *Test set has no ground truth labels (blind evaluation)*
 
-### Target Performance Goals
+### Model Performance Summary
 
 | Model | Val MRE (px) | Val SDR@24px (%) | Status |
 |-------|--------------|------------------|--------|
-| U-Net | < 70 | > 25 | ✅ **Achieved** |
-| ResNet-Keypoint | < 50 | > 35 | 📋 Planned |
+| U-Net | 48.41 | 38.0% | ✅ **Trained** |
+| ResNet-50 | 51.06 | 36.1% | ✅ **Trained** |
+| **HRNet-W32** | **43.85** | **43.65%** | ✅ **Best** 🏆 |
 | Keypoint R-CNN | < 40 | > 45 | 📋 Planned |
 | MAHT-Net | < 30 | > 55 | 📋 Planned |
 
@@ -303,11 +306,11 @@ All models are evaluated with comprehensive metrics during training:
 |-------|--------|-------------|
 | Phase 1 | ✅ Complete | Data understanding & exploration |
 | Phase 2 | ✅ Complete | UNet baseline implementation & training |
-| Phase 3 | ⏳ In Progress | Advanced models (ResNet, R-CNN, MAHT-Net) |
-| Phase 4 | ⏳ Pending | Evaluation & comparison |
+| Phase 3 | ✅ Complete | ResNet-50 & HRNet-W32 training |
+| Phase 4 | ⏳ In Progress | MAHT-Net & final evaluation |
 | Phase 5 | ⏳ Pending | Paper writing & submission |
 
-**Current Focus**: UNet baseline established. Proceeding with MAHT-Net implementation.
+**Current Focus**: HRNet-W32 achieves best results (MRE 43.85 px, SDR@24px 43.65%). Proceeding with MAHT-Net.
 
 ---
 

@@ -54,6 +54,7 @@ class ModelRegistry:
 # Register models
 from .unet import create_unet
 from .resnet_heatmap import create_resnet_heatmap
+from .hrnet_heatmap import create_hrnet_heatmap
 
 @ModelRegistry.register('unet')
 def create_unet_model(**kwargs):
@@ -71,6 +72,24 @@ def create_resnet_model(**kwargs):
 def create_resnet_heatmap_model(**kwargs):
     """Create ResNet-50 heatmap model (alias)."""
     return create_resnet_heatmap(**kwargs)
+
+
+@ModelRegistry.register('hrnet')
+def create_hrnet_model(**kwargs):
+    """Create HRNet-W32 heatmap model."""
+    return create_hrnet_heatmap(**kwargs)
+
+
+@ModelRegistry.register('hrnet-w32')
+def create_hrnet_w32_model(**kwargs):
+    """Create HRNet-W32 heatmap model (alias)."""
+    return create_hrnet_heatmap(**kwargs)
+
+
+@ModelRegistry.register('hrnet-multiscale')
+def create_hrnet_multiscale_model(**kwargs):
+    """Create HRNet-W32 with multi-scale fusion."""
+    return create_hrnet_heatmap(multi_scale=True, **kwargs)
 
 
 # Placeholder registrations for future models

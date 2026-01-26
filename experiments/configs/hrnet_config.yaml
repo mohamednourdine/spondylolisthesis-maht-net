@@ -1,0 +1,121 @@
+# HRNet-W32 Configuration for Vertebra Keypoint Detection
+# ==============================================================================
+# Reference: Sun, K., et al. "Deep High-Resolution Representation Learning 
+#            for Human Pose Estimation." CVPR 2019.
+# ==============================================================================
+
+# Model Configuration
+# ------------------------------------------------------------------------------
+model:
+  name: hrnet_w32
+  variant: single_scale  # Options: single_scale, multi_scale
+  pretrained: true       # Use ImageNet pretrained weights
+  num_keypoints: 40      # 10 vertebrae × 4 corners
+  output_size: 512       # Output heatmap resolution
+  
+  # Backbone configuration
+  backbone:
+    freeze_stages: 0     # Number of stages to freeze (0 = train all)
+                         # 0 = train full model
+                         # 1 = freeze stem + stage1
+                         # 2 = freeze stem + stage1-2
+                         # etc.
+  
+  # Head configuration  
+  head:
+    dropout_rate: 0.3    # Dropout rate in heatmap head
+
+# Training Configuration
+# ------------------------------------------------------------------------------
+training:
+  epochs: 100
+  batch_size: 4          # HRNet is more memory efficient than ResNet
+  
+  # Optimizer
+  optimizer: adamw
+  weight_decay: 0.0001
+  
+  # Learning rates (differential)
+  learning_rate: 0.0001        # Head learning rate
+  backbone_learning_rate: 0.00001  # Backbone LR (10x smaller)
+  
+  # Scheduler
+  scheduler: cosine      # Options: cosine, plateau, none
+  warmup_epochs: 5       # Warmup epochs for cosine scheduler
+  min_lr: 0.000001
+  
+  # For plateau scheduler
+  plateau_patience: 15
+  plateau_factor: 0.5
+  
+  # Early stopping
+  early_stopping_patience: 20  # HRNet may need more patience
+  
+  # Gradient clipping
+  gradient_clip: 1.0
+
+# Loss Configuration
+# ------------------------------------------------------------------------------
+loss:
+  type: weighted_mse     # Same as UNet/ResNet for fair comparison
+  background_weight: 0.05
+  keypoint_weight: 5.0
+
+# Data Configuration
+# ------------------------------------------------------------------------------
+data:
+  image_size: 512
+  train_split: 0.85
+  val_split: 0.15
+  
+  # Heatmap generation
+  heatmap_size: 512
+  heatmap_sigma: 6.0     # Gaussian sigma
+  heatmap_amplitude: 1.0
+  
+  # Augmentation
+  augmentation:
+    enabled: true
+    type: light          # Options: light, medium, heavy
+    horizontal_flip: false  # Disabled - anatomical laterality matters
+    rotation_range: 10
+    scale_range: [0.9, 1.1]
+    brightness: 0.1
+    contrast: 0.1
+
+# Evaluation Configuration
+# ------------------------------------------------------------------------------
+evaluation:
+  save_best: both        # Save best loss AND best MRE checkpoints
+  sdr_thresholds_px: [4, 8, 12, 16, 20, 24]
+  
+  # Metrics to track
+  metrics:
+    - mean_radial_error
+    - sdr_at_thresholds
+    - detection_rate
+
+# Expected Performance Targets
+# ------------------------------------------------------------------------------
+# Based on HRNet's proven superiority over ResNet for keypoint detection:
+#
+# | Metric     | UNet   | ResNet-50 | HRNet-W32 (Target) |
+# |------------|--------|-----------|-------------------|
+# | MRE        | 65 px  | 51 px     | <45 px            |
+# | SDR@24px   | 29.7%  | 36.1%     | >40%              |
+#
+# Why we expect improvement:
+# 1. Multi-resolution features maintained throughout
+# 2. Better gradient flow via parallel branches
+# 3. Proven on COCO pose: 74.4% AP vs ResNet-152's 72.0%
+
+# Hardware Notes
+# ------------------------------------------------------------------------------
+# Memory usage (approximate for batch_size=4, image_size=512):
+# - HRNet-W32: ~6 GB GPU memory
+# - ResNet-50: ~8 GB GPU memory (heavier decoder)
+# - UNet:      ~4 GB GPU memory
+#
+# Training time estimate (100 epochs, ~300 images):
+# - HRNet-W32: ~7-9 hours on M1 Pro
+# - ResNet-50: ~8-10 hours on M1 Pro

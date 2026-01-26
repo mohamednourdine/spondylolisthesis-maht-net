@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from config.mac_config import MacConfig as config
 from models.unet import UNet
 from models.resnet_heatmap import create_resnet_heatmap
+from models.hrnet_heatmap import create_hrnet_heatmap
 from src.data.preprocessing import ImagePreprocessor
 
 
@@ -54,8 +55,15 @@ def load_model(checkpoint_path, device, model_type='unet'):
             freeze_backbone_layers=0,  # No freezing at inference
             dropout_rate=0.0  # No dropout at inference
         )
+    elif model_type == 'hrnet':
+        model = create_hrnet_heatmap(
+            num_keypoints=config.NUM_KEYPOINTS,
+            pretrained=False,  # We'll load our own weights
+            freeze_backbone_stages=0,  # No freezing at inference
+            dropout_rate=0.0  # No dropout at inference
+        )
     else:
-        raise ValueError(f"Unknown model type: {model_type}")
+        raise ValueError(f"Unknown model type: {model_type}. Supported: unet, resnet, hrnet")
     
     checkpoint = torch.load(checkpoint_path, map_location=device)
     if 'model_state_dict' in checkpoint:
@@ -291,8 +299,8 @@ def main():
                        default='experiments/results/unet/mac_512px_20260112_210337/best_model.pth',
                        help='Path to model checkpoint')
     parser.add_argument('--model-type', type=str, default='unet',
-                       choices=['unet', 'resnet'],
-                       help='Model architecture type (unet or resnet)')
+                       choices=['unet', 'resnet', 'hrnet'],
+                       help='Model architecture type (unet, resnet, or hrnet)')
     parser.add_argument('--test-dir', type=str, default=None,
                        help='Directory containing test images')
     parser.add_argument('--save-dir', type=str, default='experiments/test_evaluation',
