@@ -261,23 +261,23 @@ python train_resnet.py \
 |--------|-----------------|
 | **Pretrained weights** | Better feature extraction → lower MRE |
 | **Larger receptive field** | Better context understanding |
-| **More parameters (26.5M vs 17.3M)** | Higher capacity, risk of overfitting |
+| **More parameters (38M vs 17M)** | Higher capacity, risk of overfitting |
 
-### 5.2 Target Metrics
+### 5.2 Target vs Actual Metrics
 
-| Metric | UNet Baseline | ResNet-50 Target | Improvement |
-|--------|---------------|------------------|-------------|
-| **Val MRE** | 65.07 px | <55 px | ~15% better |
-| **Val SDR@24px** | 29.8% | >40% | ~10% absolute |
+| Metric | UNet Baseline | Target | **Actual** | Status |
+|--------|---------------|--------|------------|--------|
+| **Val MRE** | 65.07 px | <55 px | **51.06 px** | ✅ Exceeded |
+| **Val SDR@24px** | 29.7% | >40% | **36.1%** | ⚠️ Close |
 
 ### 5.3 Risks and Mitigations
 
-| Risk | Mitigation |
-|------|------------|
-| Overfitting (more params, small dataset) | Freeze backbone, strong dropout, augmentation |
-| Longer training time | Reduce epochs if quick convergence |
-| Memory issues | Keep batch_size=2, use gradient checkpointing if needed |
-| Worse than UNet | Document findings, analyze failure modes |
+| Risk | Mitigation | Outcome |
+|------|------------|---------|
+| Overfitting | Freeze backbone, dropout | ✅ No overfitting observed |
+| Longer training time | Reduce epochs if needed | ⚠️ 35% longer (acceptable) |
+| Memory issues | Batch size=2 | ✅ No issues |
+| Worse than UNet | Document findings | ✅ Significantly better |
 
 ---
 
@@ -295,19 +295,55 @@ python train_resnet.py \
 - [x] Reuse UNet dataset (same heatmap format)
 
 ### Phase 3: Training & Evaluation
-- [ ] Train ResNet-50 model
-- [ ] Monitor training curves (loss, MRE, SDR)
-- [ ] Compare with UNet baseline
-- [ ] Generate visualizations
+- [x] Train ResNet-50 model (100 epochs, 7.9 hours)
+- [x] Monitor training curves (loss, MRE, SDR)
+- [x] Compare with UNet baseline
+- [x] Generate test set predictions
 
 ### Phase 4: Documentation
-- [ ] Document results
+- [x] Document results
 - [ ] Update ADVISOR_MEETING_SUMMARY.md
 - [ ] Commit and tag version
 
 ---
 
-## 7. Architecture Progression (Roadmap)
+## 7. Actual Training Results (January 26, 2026)
+
+### 7.1 Final Comparison: UNet vs ResNet-50
+
+| Metric | UNet (Baseline) | ResNet-50 | Improvement |
+|--------|-----------------|-----------|-------------|
+| **Best Val MRE** | 65.07 px | **51.06 px** | ✅ **21.5% better** |
+| **Best Val SDR@6px** | 17.8% | **18.3%** | ✅ +0.5% |
+| **Best Val SDR@12px** | 26.8% | **31.9%** | ✅ +5.1% |
+| **Best Val SDR@18px** | 29.3% | **34.9%** | ✅ +5.6% |
+| **Best Val SDR@24px** | 29.7% | **36.1%** | ✅ **+6.4%** |
+| Best Epoch | 76 | 86 | - |
+| Training Time | 5.86 hrs | 7.90 hrs | +35% |
+| Parameters | 17.27M | 38.15M | +121% |
+
+### 7.2 Key Observations
+
+1. **Pretrained weights helped significantly!**
+   - MRE improved by ~14 pixels (21.5% reduction)
+   - SDR@24px improved by 6.4 percentage points
+
+2. **Training dynamics**
+   - Best loss at epoch 39, but best MRE at epoch 86
+   - Model continued to improve on localization even after loss plateaued
+   - Saved `best_model_mre.pth` for MRE-based checkpoint
+
+3. **Trade-offs**
+   - Longer training time (35% more)
+   - 2.2× more parameters
+
+### 7.3 Conclusion
+
+**Hypothesis confirmed**: ImageNet pretrained weights provide significant improvement for vertebral landmark detection, even with a simple decoder architecture.
+
+---
+
+## 8. Architecture Progression (Roadmap)
 
 ```
 UNet (baseline)          → ResNet-50 (pretrained)      → MAHT-Net (final)

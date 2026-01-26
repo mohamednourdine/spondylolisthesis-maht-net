@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from config.mac_config import MacConfig as config
 from models.unet import UNet
+from models.resnet_heatmap import create_resnet_heatmap
 from src.data.preprocessing import ImagePreprocessor
 
 
@@ -33,17 +34,28 @@ CORNER_COLORS = {
 CORNER_NAMES = ['TL', 'TR', 'BL', 'BR']
 
 
-def load_model(checkpoint_path, device):
+def load_model(checkpoint_path, device, model_type='unet'):
     """Load trained model from checkpoint."""
     print(f"Loading model from: {checkpoint_path}")
+    print(f"Model type: {model_type}")
     
-    model = UNet(
-        in_channels=config.IN_CHANNELS,
-        num_keypoints=config.NUM_KEYPOINTS,
-        bilinear=config.BILINEAR,
-        base_channels=config.BASE_CHANNELS,
-        dropout_rate=0.0  # No dropout at inference
-    )
+    if model_type == 'unet':
+        model = UNet(
+            in_channels=config.IN_CHANNELS,
+            num_keypoints=config.NUM_KEYPOINTS,
+            bilinear=config.BILINEAR,
+            base_channels=config.BASE_CHANNELS,
+            dropout_rate=0.0  # No dropout at inference
+        )
+    elif model_type == 'resnet':
+        model = create_resnet_heatmap(
+            num_keypoints=config.NUM_KEYPOINTS,
+            pretrained=False,  # We'll load our own weights
+            freeze_backbone_layers=0,  # No freezing at inference
+            dropout_rate=0.0  # No dropout at inference
+        )
+    else:
+        raise ValueError(f"Unknown model type: {model_type}")
     
     checkpoint = torch.load(checkpoint_path, map_location=device)
     if 'model_state_dict' in checkpoint:
@@ -278,6 +290,9 @@ def main():
     parser.add_argument('--checkpoint', type=str, 
                        default='experiments/results/unet/mac_512px_20260112_210337/best_model.pth',
                        help='Path to model checkpoint')
+    parser.add_argument('--model-type', type=str, default='unet',
+                       choices=['unet', 'resnet'],
+                       help='Model architecture type (unet or resnet)')
     parser.add_argument('--test-dir', type=str, default=None,
                        help='Directory containing test images')
     parser.add_argument('--save-dir', type=str, default='experiments/test_evaluation',
@@ -293,7 +308,7 @@ def main():
     if not checkpoint_path.is_absolute():
         checkpoint_path = config.PROJECT_ROOT / checkpoint_path
     
-    model = load_model(checkpoint_path, device)
+    model = load_model(checkpoint_path, device, args.model_type)
     
     # Test directory
     if args.test_dir:
