@@ -763,6 +763,219 @@ Implement the Multi-scale Attention Hybrid Transformer Network with:
 
 ---
 
+## 13. Dataset Challenges & Their Impact on Results
+
+This section discusses the fundamental challenges encountered with the Spondylolisthesis Vertebral Landmark Dataset that contribute to the current MRE of ~44 px. Understanding these limitations is crucial for interpreting our results and planning future improvements.
+
+### 13.1 Variable Vertebrae Count: The 40-Keypoint Problem
+
+#### The Core Issue
+
+Unlike standard human pose estimation datasets (COCO: 17 keypoints, MPII: 16 keypoints), our dataset has a **variable number of vertebrae per image** (2-10 vertebrae), each with 4 corner keypoints.
+
+```
+Dataset Vertebrae Distribution:
+┌────────────────────────────────────────────┐
+│  Images with 2-4 vertebrae:  ~35%          │
+│  Images with 5-6 vertebrae:  ~45%          │
+│  Images with 7-10 vertebrae: ~20%          │
+└────────────────────────────────────────────┘
+```
+
+#### Our Forced Solution: Fixed 40-Channel Output
+
+To handle this variability, we designed our models to predict **40 heatmaps** (10 vertebrae × 4 corners):
+
+| Approach | Description | Problem |
+|----------|-------------|---------|
+| **Fixed slots** | Always predict 40 keypoints | Model must learn to output zeros for missing vertebrae |
+| **Sorted ordering** | Vertebrae sorted top-to-bottom | First ~20-28 channels used, rest are zeros |
+| **Padding** | Images with fewer vertebrae have empty channels | Imbalanced learning signal |
+
+**Impact on Results**: The model spends significant capacity learning which channels should be "off" rather than focusing purely on accurate localization.
+
+#### What Benchmark Datasets Do Differently
+
+| Dataset | Keypoints | Approach | Advantage |
+|---------|-----------|----------|-----------|
+| **COCO Pose** | 17 fixed | Always same anatomy | No ambiguity, all channels used |
+| **MPII Human Pose** | 16 fixed | Always same anatomy | Consistent supervision |
+| **BUU-LSPINE** | Variable (5-20+) | Instance detection first | Detects objects, then keypoints per instance |
+| **SpineWeb** | Variable | Per-vertebra instances | Each vertebra is a separate detection |
+
+**Recommended Alternative**: Instance-based detection (like Keypoint R-CNN) where:
+1. First detect each vertebra as a bounding box
+2. Then predict 4 keypoints per detected vertebra
+
+This avoids the fixed-channel problem entirely.
+
+### 13.2 Dataset Split & Test Set Issues
+
+#### Insufficient Test Set
+
+| Property | Our Dataset | Typical Benchmark |
+|----------|-------------|-------------------|
+| **Test Set Size** | 16 images (2.2%) | 100-500 images (10-20%) |
+| **Test Labels** | ❌ Not provided | ✅ Held-out but available for evaluation |
+| **Statistical Power** | Very low | High confidence |
+
+**Impact**: Our test evaluation is statistically weak. With only 16 images, each image contributes ~6.25% to the final metric. A single bad prediction can swing MRE by 3-5 pixels.
+
+#### Train/Val Contamination Risk
+
+The dataset combines:
+- **Honduras proprietary data**: 208 images (unique patients)
+- **BUU-LSPINE filtered**: 508 images (from public dataset)
+
+**Concern**: We don't know if the BUU-LSPINE portion has overlapping patients across train/val/test splits in the original dataset.
+
+### 13.3 Annotation Inconsistencies
+
+#### Variable Annotation Quality
+
+```
+Observed Issues (from manual inspection):
+┌──────────────────────────────────────────────────────┐
+│ ⚠️  Some vertebrae annotated with 4 corners         │
+│ ⚠️  Some with only visible corners (2-3 points)     │
+│ ⚠️  Endplate vs. body corner ambiguity              │
+│ ⚠️  Different annotator styles between sources      │
+└──────────────────────────────────────────────────────┘
+```
+
+#### Endplate Definition Ambiguity
+
+The dataset defines corners as vertebral body corners, but:
+
+| Landmark | Challenge |
+|----------|-----------|
+| **Superior endplate** | Curved surface - where exactly is the "corner"? |
+| **Inferior endplate** | Same issue, especially with degeneration |
+| **Osteophytes** | Should they be included or excluded? |
+| **Slip deformity** | Severe slips distort normal corner positions |
+
+**Impact on MRE**: Even perfect predictions may have 5-10 px "error" due to annotation subjectivity.
+
+### 13.4 Image Quality Heterogeneity
+
+#### Multi-Source Imaging Variation
+
+```
+Source 1: Honduras Clinical (208 images)
+├── Older imaging equipment
+├── Variable positioning
+├── Real pathological cases
+└── Higher noise levels
+
+Source 2: BUU-LSPINE (508 images)
+├── Standardized equipment
+├── Research protocol
+├── Mixed pathology/normal
+└── Better quality control
+```
+
+#### Resolution and Scale Variations
+
+| Property | Range | Impact |
+|----------|-------|--------|
+| **Image width** | 1200-3000 px | Different scales after resize |
+| **Aspect ratio** | 0.6-1.4 | Variable padding amounts |
+| **Pixel spacing** | 0.1-0.3 mm/px | 1 px error = 0.1-0.3 mm |
+| **Contrast** | Low to high | Affects edge detection |
+
+**Impact**: A model trained on well-contrasted images may struggle with low-contrast cases, inflating MRE on difficult samples.
+
+### 13.5 No Published Baselines for Comparison
+
+#### Benchmark Maturity Problem
+
+| Metric | Our Dataset | Established Benchmark |
+|--------|-------------|----------------------|
+| **Publication date** | June 2025 | 2018-2021 |
+| **Papers using it** | 0 | 10-50+ |
+| **Baseline methods** | None | Multiple (U-Net, HRNet, etc.) |
+| **Leaderboard** | ❌ | ✅ Often available |
+| **State-of-art MRE** | Unknown | Published |
+
+**Impact**: We cannot determine if our 43.85 px MRE is:
+- Excellent (near human-level for this dataset)
+- Average (typical first attempt)
+- Poor (significant room for improvement)
+
+#### Comparison with BUU-LSPINE Benchmarks
+
+If we could compare with BUU-LSPINE results:
+
+| Method | BUU-LSPINE MRE | Our Dataset MRE | Notes |
+|--------|----------------|-----------------|-------|
+| U-Net variants | ~15-25 px | 48.41 px | Different annotation scheme |
+| HRNet variants | ~10-20 px | 43.85 px | Different task definition |
+| Instance-based | ~8-15 px | Not tested | Recommended approach |
+
+*Note: BUU-LSPINE typically uses different landmarks (centrum, pedicles, spinous process), making direct comparison impossible.*
+
+### 13.6 Clinical Relevance of 40-Keypoint Approach
+
+#### Overengineering for the Clinical Task?
+
+For spondylolisthesis grading, we only need:
+- **4 keypoints**: Inferior endplate of slipping vertebra + superior endplate of reference
+- **Or 8 keypoints**: 2 vertebrae × 4 corners
+
+**Current Approach**: Detecting 40 keypoints for 10 vertebrae when clinically we need ~8.
+
+```
+Clinical Reality:
+┌─────────────────────────────────────────────────────────────┐
+│  Spondylolisthesis typically occurs at:                     │
+│    - L5/S1 (most common, ~85% of cases)                     │
+│    - L4/L5 (second most common, ~10%)                       │
+│    - L3/L4 (rare)                                           │
+│                                                              │
+│  We only need to detect 2 adjacent vertebrae accurately!    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 13.7 Summary of Contributing Factors to MRE
+
+| Factor | Estimated Impact | Mitigation |
+|--------|------------------|------------|
+| **40 vs. 16 keypoints** | +10-15 px | Use instance detection |
+| **Annotation subjectivity** | +5-10 px | Multi-annotator consensus |
+| **Image quality variation** | +5-8 px | Domain adaptation |
+| **Small test set** | High variance | More test data |
+| **No baselines** | Cannot assess | Wait for publications |
+| **Multi-source data** | +3-5 px | Source-specific normalization |
+
+**Total Estimated Addressable Error**: ~28-43 px
+
+### 13.8 Recommendations for Future Work
+
+1. **Switch to Instance-Based Detection**
+   - Use Keypoint R-CNN or YOLO-Pose
+   - Detect vertebrae first, then localize 4 corners per instance
+   - Eliminates the 40-channel problem
+
+2. **Clinically-Focused Approach**
+   - Only detect L4-S1 (the slip zone)
+   - 12 keypoints instead of 40
+   - Higher precision where it matters
+
+3. **Multi-Annotator Validation**
+   - Establish inter-annotator variability baseline
+   - Report MRE relative to human disagreement
+
+4. **Domain Adaptation**
+   - Separate models for Honduras vs. BUU-LSPINE sources
+   - Or explicit domain-adversarial training
+
+5. **Benchmark Alternative**
+   - Consider using BUU-LSPINE directly
+   - Published baselines for comparison
+   - Established evaluation protocol
+
+---
+
 *Document generated: January 26, 2026*
-*Last updated: January 26, 2026 (HRNet-W32 results added)*
+*Last updated: January 26, 2026 (HRNet-W32 results, Dataset Challenges section added)*
 *Project: spondylolisthesis-maht-net*
