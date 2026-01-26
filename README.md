@@ -2,7 +2,7 @@
 
 **Goal**: Establish the first baseline performance metrics for automated spondylolisthesis grading using deep learning.
 
-This project implements and benchmarks four models: **U-Net**, **ResNet Keypoint Detector**, **Keypoint R-CNN**, and **MAHT-Net** on the Spondylolisthesis Vertebral Landmark Dataset.
+This project implements and benchmarks deep learning models for vertebral landmark detection: **U-Net**, **ResNet-50**, **HRNet-W32**, and **MAHT-Net** (planned) on the Spondylolisthesis Vertebral Landmark Dataset.
 
 ---
 
@@ -10,16 +10,24 @@ This project implements and benchmarks four models: **U-Net**, **ResNet Keypoint
 
 ### Best Model: HRNet-W32 🏆
 
-| Metric | HRNet-W32 | ResNet-50 | UNet |
-|--------|-----------|-----------|------|
-| **Val MRE** | **43.85 px** | 51.06 px | 48.41 px |
-| **Val SDR@24px** | **43.65%** | 36.1% | 38.0% |
-| Val SDR@18px | 42.28% | - | 36.4% |
-| Val SDR@12px | 38.82% | - | 31.9% |
-| Val SDR@6px | 26.14% | - | 19.5% |
-| Parameters | 31.78M | 30.79M | 8.65M |
+| Metric | HRNet-W32 | UNet | ResNet-50 |
+|--------|-----------|------|-----------|
+| **Val MRE** | **43.85 px** | 48.41 px | 51.06 px |
+| **Val SDR@24px** | **43.65%** | 38.0% | 36.1% |
+| Val SDR@18px | 42.28% | 36.4% | - |
+| Val SDR@12px | 38.82% | 31.9% | - |
+| Val SDR@6px | 26.14% | 19.5% | - |
+| Parameters | 31.78M | 8.65M | 30.79M |
+| Training Time | 4.71 hrs | ~4 hrs | 7.90 hrs |
+| Best Epoch | 87/100 | 82/100 | 86/100 |
 
-*Trained on 494 images, validated on 204 images, tested on 16 images*
+*Trained on 496 images, validated on 204 images, tested on 16 images (no ground truth)*
+
+### Key Achievements
+- ✅ **HRNet-W32**: 43.85 px MRE (32.6% better than UNet baseline)
+- ✅ **ImageNet pretrained backbone** with frozen layers + differential learning rates
+- ✅ **Cosine annealing scheduler** with 5-epoch warmup
+- ✅ **Per-layer dropout** and MC Dropout for uncertainty estimation
 
 ---
 
@@ -234,17 +242,18 @@ Comprehensive guides available:
 | Component | Status | Description |
 |-----------|--------|-------------|
 | **Data Pipeline** | ✅ Complete | Dataset loading, preprocessing, augmentation |
-| **UNet Model** | ✅ Complete | Architecture, training, evaluation, **baseline established** |
+| **UNet Model** | ✅ Complete | Baseline model, Val MRE: 48.41 px |
+| **ResNet-50 Model** | ✅ Complete | Heatmap regression, Val MRE: 51.06 px |
+| **HRNet-W32 Model** | ✅ Complete | **Best model**, Val MRE: 43.85 px 🏆 |
 | **Training System** | ✅ Complete | Multi-model framework with metrics tracking |
 | **Metrics & Evaluation** | ✅ Complete | MRE, MSE, SDR (6px, 12px, 18px, 24px) |
-| **Visualization Tools** | ✅ Complete | Prediction overlay, heatmap comparison |
+| **Visualization Tools** | ✅ Complete | Prediction overlay, heatmap comparison, training curves |
 | **Test Evaluation** | ✅ Complete | Inference on held-out test set |
 | **Project Organization** | ✅ Complete | Clean structure, tests, experiment management |
-| **MAHT-Net** | 📋 Planned | Implementation pending |
-| **ResNet-Keypoint** | 📋 Planned | Implementation pending |
-| **Keypoint-RCNN** | 📋 Planned | Implementation pending |
+| **MAHT-Net** | 📋 Planned | Multi-scale Attention Hybrid Transformer |
+| **Keypoint-RCNN** | 📋 Planned | Instance-based detection approach |
 
-**Current Focus**: UNet baseline complete. Ready for MAHT-Net implementation.
+**Current Focus**: HRNet-W32 achieves best results. Proceeding with MAHT-Net implementation.
 
 ### 🎯 Implementation Status
 
@@ -255,16 +264,25 @@ Comprehensive guides available:
   - Automatic experiment organization by model type
   - Mac/MPS optimization for Apple Silicon
   
-- ✅ **UNet Implementation** (Baseline Complete)
-  - 17.27M parameters, encoder-decoder architecture
+- ✅ **UNet Implementation** (Baseline)
+  - 8.65M parameters, encoder-decoder architecture
   - Heatmap-based keypoint detection (40 channels for 10 vertebrae × 4 corners)
   - Weighted MSE loss with keypoint emphasis
-  - Dropout regularization (30% at bottleneck)
-  - Enhanced augmentation (rotation, brightness, contrast, noise)
-  - Val MRE: 66-71 px, Val SDR@24px: 28.2%
+  - Val MRE: 48.41 px, Val SDR@24px: 38.0%
+
+- ✅ **ResNet-50 Implementation**
+  - 30.79M parameters, pretrained backbone
+  - Heatmap regression with bilinear upsampling
+  - Val MRE: 51.06 px, Val SDR@24px: 36.1%
+
+- ✅ **HRNet-W32 Implementation** (Best Model)
+  - 31.78M parameters, ImageNet pretrained via `timm`
+  - Parallel multi-resolution branches with cross-scale fusion
+  - Differential learning rates (backbone: 1e-5, head: 1e-4)
+  - Cosine annealing with 5-epoch warmup
+  - Val MRE: 43.85 px, Val SDR@24px: 43.65%
 
 - 📋 **Pending Models**
-  - ResNet-Keypoint: Direct coordinate regression
   - Keypoint R-CNN: Instance-aware detection
   - MAHT-Net: Multi-scale attention heatmap transformer
 
@@ -279,38 +297,44 @@ All models are evaluated with comprehensive metrics during training:
 
 > **Note**: Using pixel-based metrics as the dataset (JPG format) lacks calibration metadata for mm conversion.
 
-### UNet Baseline Results (Achieved)
+### Model Performance Summary (All Trained Models)
 
-| Metric | Train | Validation | Test |
-|--------|-------|------------|------|
-| **MRE** | ~45 px | 48.41 px | N/A* |
-| **MSE** | ~4,500 px² | ~4,500 px² | N/A* |
-| **SDR@6px** | ~22% | 19.5% | N/A* |
-| **SDR@12px** | ~28% | 31.9% | N/A* |
-| **SDR@18px** | ~32% | 36.4% | N/A* |
-| **SDR@24px** | ~35% | 38.0% | N/A* |
+| Model | Val MRE (px) | Val SDR@24px | Parameters | Training Time | Status |
+|-------|--------------|--------------|------------|---------------|--------|
+| **HRNet-W32** | **43.85** | **43.65%** | 31.78M | 4.71 hrs | 🏆 **Best** |
+| UNet | 48.41 | 38.0% | 8.65M | ~4 hrs | ✅ Trained |
+| ResNet-50 | 51.06 | 36.1% | 30.79M | 7.90 hrs | ✅ Trained |
+| Keypoint R-CNN | < 40 | > 45% | - | - | 📋 Planned |
+| MAHT-Net | < 35 | > 50% | - | - | 📋 Planned |
 
-*Test set has no ground truth labels (blind evaluation)*
+*Test set (16 images) has no ground truth labels - blind evaluation only*
 
-### Model Performance Summary
+### Improvement Over Baseline
 
-| Model | Val MRE (px) | Val SDR@24px (%) | Status |
-|-------|--------------|------------------|--------|
-| U-Net | 48.41 | 38.0% | ✅ **Trained** |
-| ResNet-50 | 51.06 | 36.1% | ✅ **Trained** |
-| **HRNet-W32** | **43.85** | **43.65%** | ✅ **Best** 🏆 |
-| Keypoint R-CNN | < 40 | > 45 | 📋 Planned |
-| MAHT-Net | < 30 | > 55 | 📋 Planned |
+| Comparison | MRE Improvement | SDR@24px Improvement |
+|------------|-----------------|----------------------|
+| HRNet vs UNet | -9.4% (4.56 px) | +14.9% (5.65 pts) |
+| HRNet vs ResNet | -14.1% (7.21 px) | +20.9% (7.55 pts) |
+
+### Project Phases
 
 | Phase | Status | Description |
 |-------|--------|-------------|
 | Phase 1 | ✅ Complete | Data understanding & exploration |
 | Phase 2 | ✅ Complete | UNet baseline implementation & training |
 | Phase 3 | ✅ Complete | ResNet-50 & HRNet-W32 training |
-| Phase 4 | ⏳ In Progress | MAHT-Net & final evaluation |
+| Phase 4 | ⏳ In Progress | MAHT-Net & Keypoint R-CNN implementation |
 | Phase 5 | ⏳ Pending | Paper writing & submission |
 
 **Current Focus**: HRNet-W32 achieves best results (MRE 43.85 px, SDR@24px 43.65%). Proceeding with MAHT-Net.
+
+### Dataset Challenges
+
+See [docs/ADVISOR_MEETING_SUMMARY.md](docs/ADVISOR_MEETING_SUMMARY.md#13-dataset-challenges--their-impact-on-results) for detailed analysis of factors affecting results:
+- Variable vertebrae count requiring 40-keypoint prediction
+- Insufficient test set (16 images, no labels)
+- Multi-source image quality variation
+- No published baselines for comparison
 
 ---
 
@@ -320,17 +344,19 @@ All models are evaluated with comprehensive metrics during training:
 
 | Script | Description |
 |--------|-------------|
-| `train_mac.py` | Mac-optimized training with MPS acceleration |
+| `train_hrnet.py` | HRNet-W32 training with pretrained backbone |
+| `train_resnet.py` | ResNet-50 heatmap regression training |
+| `train_mac.py` | UNet training optimized for Mac/MPS |
 | `train.py` | Full training for cloud/GPU environments |
-| `scripts/train_unet.py` | Standalone UNet training script |
 
 ### Evaluation & Visualization Scripts
 
 | Script | Description |
 |--------|-------------|
 | `scripts/visualize_predictions.py` | Visualize predictions vs ground truth |
-| `scripts/evaluate_test.py` | Run inference on test set |
+| `scripts/evaluate_test.py` | Run inference on test set (supports unet, resnet, hrnet) |
 | `scripts/compare_experiments.py` | Compare training experiments |
+| `scripts/generate_training_curves.py` | Generate training curves for all models |
 | `scripts/diagnose_predictions.py` | Debug model predictions |
 
 ### Utility Scripts
@@ -346,6 +372,7 @@ All models are evaluated with comprehensive metrics during training:
 | Script | Description |
 |--------|-------------|
 | `tests/test_training_small.py` | Quick 2-epoch training test |
+| `tests/test_hrnet_quick.py` | HRNet model verification test |
 | `tests/test_components.py` | Test individual components |
 | `tests/test_unet.py` | UNet model tests |
 | `tests/test_loss_functions.py` | Loss function tests |
@@ -362,39 +389,38 @@ All models are evaluated with comprehensive metrics during training:
 
 ---
 
-## 📈 Expected Results
+## 📈 Model Architectures
 
-### Achieved Results (UNet Baseline)
-
-| Metric | Value | Notes |
-|--------|-------|-------|
-| **Val MRE** | 66-71 px | ~17% of image width |
-| **Val SDR@24px** | 28.2% | 28% within 24 pixels |
-| **Training Time** | 2.6 hours | 50 epochs on M1 Mac |
-| **Model Size** | 17.27M params | Base channels: 64 |
-
-### Model Architecture Details
+### Best Model: HRNet-W32 Architecture
 
 ```
-UNet Configuration:
-├── Input: 512 x 512 x 3 (RGB)
-├── Encoder: 5 levels (64 → 128 → 256 → 512 → 512)
-├── Decoder: 5 levels with skip connections
-├── Output: 512 x 512 x 40 (10 vertebrae × 4 corners)
-├── Dropout: 30% at bottleneck
-├── Heatmap Sigma: 15 pixels
-└── Loss: Weighted MSE (keypoint weight: 5x, background: 0.05x)
+HRNet-W32 Configuration:
+├── Input: 512 × 512 × 3 (RGB)
+├── Backbone: HRNet-W32 (ImageNet pretrained via timm)
+│   ├── Stage 1: 64 channels (1/4 resolution)
+│   ├── Stage 2: 32, 64 channels (parallel branches)
+│   ├── Stage 3: 32, 64, 128 channels
+│   └── Stage 4: 32, 64, 128, 256 channels
+├── Cross-scale Fusion: Upsampling + 1×1 conv
+├── Head: 480 → 64 → 40 channels
+├── Output: 512 × 512 × 40 (10 vertebrae × 4 corners)
+└── Training: AdamW, cosine annealing, warmup 5 epochs
 ```
 
-### Target Performance (Other Models)
+### All Model Architectures
 
-| Model | Target MRE | Target SDR@24px | Priority |
-|-------|------------|-----------------|----------|
-| ResNet-Keypoint | < 50 px | > 35% | High |
-| Keypoint R-CNN | < 40 px | > 45% | Medium |
-| MAHT-Net | < 30 px | > 55% | High |
+| Model | Architecture | Backbone | Parameters |
+|-------|--------------|----------|------------|
+| **HRNet-W32** | Multi-resolution parallel branches | ImageNet pretrained | 31.78M |
+| UNet | Encoder-decoder with skip connections | From scratch | 8.65M |
+| ResNet-50 | Feature pyramid + upsampling | ImageNet pretrained | 30.79M |
 
-*Note: These are relative improvements expected over UNet baseline.*
+### Target Performance (Pending Models)
+
+| Model | Target MRE | Target SDR@24px | Notes |
+|-------|------------|-----------------|-------|
+| Keypoint R-CNN | < 40 px | > 45% | Instance-based detection |
+| MAHT-Net | < 35 px | > 50% | Multi-scale attention transformer |
 
 ---
 
@@ -478,20 +504,26 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 # Test locally first (2 minutes)
 python tests/test_training_small.py
 
-# Train on Mac (2.5 hours)
-python train_mac.py --epochs 50 --batch-size 4
+# Train HRNet-W32 (best model, ~5 hours on GPU)
+python train_hrnet.py --epochs 100 --batch-size 8
 
-# Train full model in cloud
-python train.py --model unet --epochs 50 --batch-size 8 --experiment-name production_v1
+# Train ResNet-50
+python train_resnet.py --epochs 100 --batch-size 8
+
+# Train UNet on Mac (2.5 hours)
+python train_mac.py --epochs 50 --batch-size 4
 
 # Visualize predictions
 python scripts/visualize_predictions.py --num-samples 10 --heatmaps
 
-# Evaluate on test set
-python scripts/evaluate_test.py
+# Evaluate on test set (supports unet, resnet, hrnet)
+python scripts/evaluate_test.py --model-type hrnet
+
+# Generate training curves comparison
+python scripts/generate_training_curves.py
 
 # Compare results
-python scripts/compare_experiments.py --model unet
+python scripts/compare_experiments.py --model hrnet
 ```
 
 ---
@@ -517,6 +549,8 @@ spondylolisthesis-maht-net/
 │   └── test_evaluation/        # Test set results
 ├── models/                     # Model architectures
 │   ├── unet.py                 # UNet implementation
+│   ├── resnet_keypoint.py      # ResNet-50 heatmap model
+│   ├── hrnet_heatmap.py        # HRNet-W32 (best model)
 │   └── maht_net.py             # MAHT-Net (planned)
 ├── scripts/                    # Utility scripts
 ├── src/                        # Core source code
