@@ -76,6 +76,8 @@ data/Train/Keypointrcnn_data/images/**/*.png
 data/Test/**/*.jpg
 data/Test/**/*.jpeg
 data/Test/**/*.png
+data/buu-lspine
+data/spondylolisthesis-dataset
 
 # Keep JSON annotation files but ignore large datasets
 # Uncomment if you want to exclude annotations as well
