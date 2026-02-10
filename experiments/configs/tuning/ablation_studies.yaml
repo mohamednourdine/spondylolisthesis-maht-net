@@ -1,0 +1,353 @@
+# ==============================================================================
+# MAHT-Net Ablation Studies Configuration
+# ==============================================================================
+# Configurations for systematic ablation experiments.
+# These experiments are required for publication to demonstrate the
+# contribution of each component.
+#
+# Focus: VAM (our key contribution)
+# ==============================================================================
+
+_base_: "maht_net_base.yaml"
+
+# ==============================================================================
+# Phase Ablation: Phase 1 → Phase 2 → Phase 3
+# ==============================================================================
+phase_ablation:
+  - name: "phase1_baseline"
+    description: "Phase 1: CNN Backbone + Simple Decoder (baseline)"
+    model:
+      phase: 1
+      transformer_bridge:
+        enabled: false
+      vam:
+        enabled: false
+      uncertainty:
+        enabled: false
+    loss:
+      use_anatomical: false
+      use_uncertainty: false
+      lambda_anatomical: 0.0
+      lambda_uncertainty: 0.0
+      
+  - name: "phase1_multiscale"
+    description: "Phase 1: Backbone + Multi-scale Decoder"
+    model:
+      phase: 1
+      decoder:
+        type: "multi_scale"
+      transformer_bridge:
+        enabled: false
+      vam:
+        enabled: false
+      uncertainty:
+        enabled: false
+    loss:
+      use_anatomical: false
+      use_uncertainty: false
+      
+  - name: "phase2_transformer_only"
+    description: "Phase 2: Add Transformer Bridge (no VAM)"
+    model:
+      phase: 2
+      transformer_bridge:
+        enabled: true
+        num_layers: 4
+      vam:
+        enabled: false
+      uncertainty:
+        enabled: false
+    loss:
+      use_anatomical: false
+      use_uncertainty: false
+      
+  - name: "phase2_vam_only"
+    description: "Phase 2: Add VAM (no Transformer)"
+    model:
+      phase: 2
+      transformer_bridge:
+        enabled: false
+      vam:
+        enabled: true
+        num_layers: 3
+      uncertainty:
+        enabled: false
+    loss:
+      use_anatomical: false
+      use_uncertainty: false
+      
+  - name: "phase2_full"
+    description: "Phase 2: Transformer + VAM (full architecture)"
+    model:
+      phase: 2
+      transformer_bridge:
+        enabled: true
+        num_layers: 4
+      vam:
+        enabled: true
+        num_layers: 3
+      uncertainty:
+        enabled: false
+    loss:
+      use_anatomical: true
+      use_uncertainty: false
+      
+  - name: "phase3_full"
+    description: "Phase 3: Full MAHT-Net + DARK + Uncertainty"
+    model:
+      phase: 3
+      transformer_bridge:
+        enabled: true
+        num_layers: 4
+      vam:
+        enabled: true
+        num_layers: 3
+      uncertainty:
+        enabled: true
+        type: "learned"
+    loss:
+      use_anatomical: true
+      use_uncertainty: true
+
+# ==============================================================================
+# VAM Ablation (Key Contribution)
+# ==============================================================================
+vam_ablation:
+  - name: "vam_disabled"
+    description: "No Vertebral Attention Module"
+    model:
+      vam:
+        enabled: false
+    expected_delta: "+0.35mm"  # Expected MED increase
+    
+  - name: "vam_no_bias"
+    description: "VAM without anatomical bias matrix"
+    model:
+      vam:
+        enabled: true
+        use_anatomical_bias: false
+    expected_delta: "+0.15mm"
+    
+  - name: "vam_full"
+    description: "Full VAM with anatomical bias (recommended)"
+    model:
+      vam:
+        enabled: true
+        use_anatomical_bias: true
+    expected_delta: "baseline"
+
+# ==============================================================================
+# Component Ablation
+# ==============================================================================
+component_ablation:
+  # Transformer Bridge
+  - name: "no_transformer"
+    description: "Without Transformer Bridge"
+    model:
+      transformer_bridge:
+        enabled: false
+    expected_delta: "+0.25mm"
+    
+  - name: "with_transformer"
+    description: "With Transformer Bridge"
+    model:
+      transformer_bridge:
+        enabled: true
+    expected_delta: "baseline"
+
+  # Anatomical Loss
+  - name: "no_anatomical_loss"
+    description: "Without Anatomical Structure Loss"
+    loss:
+      use_anatomical: false
+      lambda_anatomical: 0.0
+    expected_delta: "+0.15mm"
+    
+  - name: "with_anatomical_loss"
+    description: "With Anatomical Structure Loss"
+    loss:
+      use_anatomical: true
+      lambda_anatomical: 0.1
+    expected_delta: "baseline"
+
+  # DARK Decoding
+  - name: "argmax_decoding"
+    description: "Standard argmax (no sub-pixel refinement)"
+    # Note: Configured at inference time
+    decoding: "argmax"
+    expected_delta: "+0.20mm"
+    
+  - name: "soft_argmax_decoding"
+    description: "Soft-argmax decoding"
+    decoding: "soft_argmax"
+    expected_delta: "+0.10mm"
+    
+  - name: "dark_decoding"
+    description: "DARK sub-pixel decoding (recommended)"
+    decoding: "dark"
+    expected_delta: "baseline"
+
+  # Uncertainty
+  - name: "no_uncertainty"
+    description: "Without uncertainty estimation"
+    model:
+      uncertainty:
+        enabled: false
+    loss:
+      use_uncertainty: false
+    expected_delta: "+0.05mm"  # Slight improvement from regularization
+    
+  - name: "with_uncertainty"
+    description: "With uncertainty estimation"
+    model:
+      uncertainty:
+        enabled: true
+    loss:
+      use_uncertainty: true
+    expected_delta: "baseline"
+
+# ==============================================================================
+# Loss Component Ablation
+# ==============================================================================
+loss_ablation:
+  - name: "heatmap_only"
+    description: "Only heatmap loss (MSE)"
+    loss:
+      lambda_heatmap: 1.0
+      lambda_coord: 0.0
+      lambda_anatomical: 0.0
+      lambda_uncertainty: 0.0
+      
+  - name: "heatmap_coord"
+    description: "Heatmap + Coordinate loss"
+    loss:
+      lambda_heatmap: 1.0
+      lambda_coord: 0.5
+      lambda_anatomical: 0.0
+      lambda_uncertainty: 0.0
+      
+  - name: "heatmap_coord_anatomical"
+    description: "Heatmap + Coordinate + Anatomical"
+    loss:
+      lambda_heatmap: 1.0
+      lambda_coord: 0.5
+      lambda_anatomical: 0.1
+      lambda_uncertainty: 0.0
+      
+  - name: "full_loss"
+    description: "All loss components (recommended)"
+    loss:
+      lambda_heatmap: 1.0
+      lambda_coord: 0.5
+      lambda_anatomical: 0.1
+      lambda_uncertainty: 0.1
+
+# ==============================================================================
+# Data Augmentation Ablation
+# ==============================================================================
+augmentation_ablation:
+  - name: "no_augmentation"
+    description: "No data augmentation (baseline)"
+    augmentation:
+      geometric:
+        shift_scale_rotate:
+          enabled: false
+        horizontal_flip:
+          enabled: false
+        affine_shear:
+          enabled: false
+      intensity:
+        brightness_contrast:
+          enabled: false
+        gaussian_noise:
+          enabled: false
+        gaussian_blur:
+          enabled: false
+        clahe:
+          enabled: false
+      cutout:
+        enabled: false
+        
+  - name: "geometric_only"
+    description: "Only geometric augmentations"
+    augmentation:
+      geometric:
+        shift_scale_rotate:
+          enabled: true
+        horizontal_flip:
+          enabled: true
+        affine_shear:
+          enabled: true
+      intensity:
+        brightness_contrast:
+          enabled: false
+        gaussian_noise:
+          enabled: false
+        gaussian_blur:
+          enabled: false
+        clahe:
+          enabled: false
+      cutout:
+        enabled: false
+        
+  - name: "intensity_only"
+    description: "Only intensity augmentations"
+    augmentation:
+      geometric:
+        shift_scale_rotate:
+          enabled: false
+        horizontal_flip:
+          enabled: false
+        affine_shear:
+          enabled: false
+      intensity:
+        brightness_contrast:
+          enabled: true
+        gaussian_noise:
+          enabled: true
+        gaussian_blur:
+          enabled: true
+        clahe:
+          enabled: true
+      cutout:
+        enabled: false
+        
+  - name: "full_augmentation"
+    description: "All augmentations (recommended)"
+    augmentation:
+      geometric:
+        shift_scale_rotate:
+          enabled: true
+        horizontal_flip:
+          enabled: true
+        affine_shear:
+          enabled: true
+      intensity:
+        brightness_contrast:
+          enabled: true
+        gaussian_noise:
+          enabled: true
+        gaussian_blur:
+          enabled: true
+        clahe:
+          enabled: true
+      cutout:
+        enabled: true
+
+# ==============================================================================
+# Expected Results Table (for paper)
+# ==============================================================================
+# 
+# Table: Ablation Study Results on BUU-LSPINE Dataset
+# 
+# | Configuration              | AP MED (mm) | LA MED (mm) | Δ MED |
+# |----------------------------|-------------|-------------|-------|
+# | MAHT-Net-S (full)          | 3.85        | 3.92        | -     |
+# | − VAM                      | 4.20        | 4.30        | +0.35 |
+# | − Anatomical loss          | 4.00        | 4.05        | +0.15 |
+# | − Transformer bridge       | 4.10        | 4.15        | +0.25 |
+# | − DARK decoding            | 4.05        | 4.10        | +0.20 |
+# 
+# Note: These are expected values based on architecture design. 
+#       Actual values will be filled after experiments.
+# ==============================================================================

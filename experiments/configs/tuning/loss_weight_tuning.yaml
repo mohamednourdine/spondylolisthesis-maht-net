@@ -1,0 +1,296 @@
+# ==============================================================================
+# MAHT-Net Hyperparameter Tuning - Loss Function Weights
+# ==============================================================================
+# Configurations for loss function weights and types tuning.
+# 
+# Total Loss = λ₁·L_heatmap + λ₂·L_coordinate + λ₃·L_anatomical + λ₄·L_uncertainty
+#
+# Default weights from architecture spec:
+# - λ_heatmap: 1.0 (primary supervision)
+# - λ_coord: 0.5 (direct coordinate refinement)
+# - λ_anatomical: 0.1 (regularization)
+# - λ_uncertainty: 0.1 (calibration)
+# ==============================================================================
+
+_base_: "maht_net_base.yaml"
+
+experiments:
+  # --------------------------------------------------------------------------
+  # Experiment 1: Heatmap Loss Type
+  # --------------------------------------------------------------------------
+  - name: "loss_heatmap_mse"
+    description: "Standard MSE loss (simple, works well)"
+    loss:
+      heatmap_type: "mse"
+      
+  - name: "loss_heatmap_focal"
+    description: "Focal MSE (handles background imbalance)"
+    loss:
+      heatmap_type: "focal_mse"
+      focal_mse:
+        gamma: 2.0
+
+  - name: "loss_heatmap_focal_g1"
+    description: "Focal MSE with lower gamma"
+    loss:
+      heatmap_type: "focal_mse"
+      focal_mse:
+        gamma: 1.0
+        
+  - name: "loss_heatmap_focal_g3"
+    description: "Focal MSE with higher gamma"
+    loss:
+      heatmap_type: "focal_mse"
+      focal_mse:
+        gamma: 3.0
+
+  # --------------------------------------------------------------------------
+  # Experiment 2: Coordinate Loss Type
+  # --------------------------------------------------------------------------
+  - name: "loss_coord_l1"
+    description: "L1 loss for coordinates"
+    loss:
+      coord_type: "l1"
+      
+  - name: "loss_coord_wing"
+    description: "Wing loss (recommended for keypoint localization)"
+    loss:
+      coord_type: "wing"
+      wing:
+        w: 10.0
+        epsilon: 2.0
+        
+  - name: "loss_coord_wing_narrow"
+    description: "Wing loss with narrower transition"
+    loss:
+      coord_type: "wing"
+      wing:
+        w: 5.0
+        epsilon: 1.0
+        
+  - name: "loss_coord_wing_wide"
+    description: "Wing loss with wider transition"
+    loss:
+      coord_type: "wing"
+      wing:
+        w: 15.0
+        epsilon: 3.0
+
+  # --------------------------------------------------------------------------
+  # Experiment 3: Heatmap Loss Weight (λ_heatmap)
+  # --------------------------------------------------------------------------
+  - name: "lambda_heatmap_0.5"
+    loss:
+      lambda_heatmap: 0.5
+      
+  - name: "lambda_heatmap_1.0"
+    description: "Default heatmap weight"
+    loss:
+      lambda_heatmap: 1.0
+      
+  - name: "lambda_heatmap_2.0"
+    description: "Higher emphasis on heatmap"
+    loss:
+      lambda_heatmap: 2.0
+
+  # --------------------------------------------------------------------------
+  # Experiment 4: Coordinate Loss Weight (λ_coord)
+  # --------------------------------------------------------------------------
+  - name: "lambda_coord_0.0"
+    description: "No coordinate loss (heatmap only)"
+    loss:
+      lambda_coord: 0.0
+      
+  - name: "lambda_coord_0.1"
+    loss:
+      lambda_coord: 0.1
+      
+  - name: "lambda_coord_0.5"
+    description: "Default coordinate weight"
+    loss:
+      lambda_coord: 0.5
+      
+  - name: "lambda_coord_1.0"
+    description: "Equal weight to heatmap"
+    loss:
+      lambda_coord: 1.0
+
+  # --------------------------------------------------------------------------
+  # Experiment 5: Anatomical Loss Weight (λ_anatomical)
+  # --------------------------------------------------------------------------
+  - name: "anatomical_off"
+    description: "No anatomical constraints"
+    loss:
+      use_anatomical: false
+      lambda_anatomical: 0.0
+      
+  - name: "anatomical_light"
+    description: "Light anatomical regularization"
+    loss:
+      use_anatomical: true
+      lambda_anatomical: 0.05
+      anatomical:
+        order_weight: 1.0
+        parallel_weight: 0.05
+        ratio_weight: 0.05
+        
+  - name: "anatomical_default"
+    description: "Default anatomical weights"
+    loss:
+      use_anatomical: true
+      lambda_anatomical: 0.1
+      anatomical:
+        order_weight: 1.0
+        parallel_weight: 0.1
+        ratio_weight: 0.1
+        
+  - name: "anatomical_strong"
+    description: "Strong anatomical constraints"
+    loss:
+      use_anatomical: true
+      lambda_anatomical: 0.3
+      anatomical:
+        order_weight: 1.0
+        parallel_weight: 0.2
+        ratio_weight: 0.2
+
+  # --------------------------------------------------------------------------
+  # Experiment 6: Uncertainty Loss Weight (λ_uncertainty) - Phase 3
+  # --------------------------------------------------------------------------
+  - name: "uncertainty_off"
+    description: "No uncertainty estimation"
+    loss:
+      use_uncertainty: false
+      lambda_uncertainty: 0.0
+    model:
+      uncertainty:
+        enabled: false
+        
+  - name: "uncertainty_light"
+    loss:
+      use_uncertainty: true
+      lambda_uncertainty: 0.05
+      
+  - name: "uncertainty_default"
+    description: "Default uncertainty weight"
+    loss:
+      use_uncertainty: true
+      lambda_uncertainty: 0.1
+      
+  - name: "uncertainty_strong"
+    loss:
+      use_uncertainty: true
+      lambda_uncertainty: 0.2
+
+  # --------------------------------------------------------------------------
+  # Experiment 7: Anatomical Loss Component Analysis
+  # --------------------------------------------------------------------------
+  - name: "anatomical_order_only"
+    description: "Only vertex ordering constraint"
+    loss:
+      use_anatomical: true
+      lambda_anatomical: 0.1
+      anatomical:
+        order_weight: 1.0
+        parallel_weight: 0.0
+        ratio_weight: 0.0
+        
+  - name: "anatomical_parallel_only"
+    description: "Only parallel edges constraint"
+    loss:
+      use_anatomical: true
+      lambda_anatomical: 0.1
+      anatomical:
+        order_weight: 0.0
+        parallel_weight: 1.0
+        ratio_weight: 0.0
+        
+  - name: "anatomical_ratio_only"
+    description: "Only aspect ratio constraint"
+    loss:
+      use_anatomical: true
+      lambda_anatomical: 0.1
+      anatomical:
+        order_weight: 0.0
+        parallel_weight: 0.0
+        ratio_weight: 1.0
+
+  # --------------------------------------------------------------------------
+  # Experiment 8: Combined Loss Configurations
+  # --------------------------------------------------------------------------
+  - name: "loss_heatmap_dominant"
+    description: "Focus on heatmap regression"
+    loss:
+      lambda_heatmap: 1.0
+      lambda_coord: 0.1
+      lambda_anatomical: 0.05
+      lambda_uncertainty: 0.05
+      
+  - name: "loss_balanced"
+    description: "Balanced loss weights"
+    loss:
+      lambda_heatmap: 1.0
+      lambda_coord: 0.5
+      lambda_anatomical: 0.1
+      lambda_uncertainty: 0.1
+      
+  - name: "loss_coord_focused"
+    description: "Emphasis on coordinate accuracy"
+    loss:
+      lambda_heatmap: 0.5
+      lambda_coord: 1.0
+      lambda_anatomical: 0.1
+      lambda_uncertainty: 0.1
+
+  # --------------------------------------------------------------------------
+  # Experiment 9: Heatmap Sigma (Gaussian spread)
+  # --------------------------------------------------------------------------
+  - name: "sigma_1"
+    description: "Tight Gaussian (more precise)"
+    data:
+      heatmap:
+        sigma: 1.0
+        
+  - name: "sigma_2"
+    description: "Default sigma"
+    data:
+      heatmap:
+        sigma: 2.0
+        
+  - name: "sigma_3"
+    description: "Wider Gaussian (more forgiving)"
+    data:
+      heatmap:
+        sigma: 3.0
+        
+  - name: "sigma_4"
+    description: "Wide Gaussian"
+    data:
+      heatmap:
+        sigma: 4.0
+
+# ==============================================================================
+# Recommended configurations
+# ==============================================================================
+recommended:
+  name: "loss_recommended"
+  description: "Recommended loss configuration from architecture spec"
+  loss:
+    heatmap_type: "mse"
+    coord_type: "wing"
+    use_anatomical: true
+    use_uncertainty: true
+    lambda_heatmap: 1.0
+    lambda_coord: 0.5
+    lambda_anatomical: 0.1
+    lambda_uncertainty: 0.1
+    wing:
+      w: 10.0
+      epsilon: 2.0
+    anatomical:
+      order_weight: 1.0
+      parallel_weight: 0.1
+      ratio_weight: 0.1
+  data:
+    heatmap:
+      sigma: 2.0

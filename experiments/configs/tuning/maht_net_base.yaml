@@ -1,0 +1,308 @@
+# ==============================================================================
+# MAHT-Net Hyperparameter Tuning - Base Configuration
+# ==============================================================================
+# Complete configuration file for MAHT-Net training and hyperparameter tuning.
+# This serves as the reference config - create variants for specific experiments.
+#
+# Target: MED < 4.0mm (beat Klinwichit baseline: 4.63mm AP, 4.91mm LA)
+# ==============================================================================
+
+experiment:
+  name: "maht_net_baseline"
+  description: "Full MAHT-Net Phase 3 with default hyperparameters"
+  version: "1.0"
+  random_seed: 42
+
+# ==============================================================================
+# Model Architecture
+# ==============================================================================
+model:
+  name: "MAHT-Net"
+  phase: 3  # 1: backbone+decoder, 2: +transformer+VAM, 3: +uncertainty
+  view: "AP"  # "AP" (20 keypoints) or "LA" (22 keypoints)
+  
+  backbone:
+    type: "efficientnet_v2_s"
+    pretrained: true
+    freeze_stages: 2  # 0-4, freeze early layers for transfer learning
+    out_channels: 256
+  
+  transformer_bridge:
+    enabled: true
+    d_model: 256
+    num_layers: 4  # [2, 4, 6] for tuning
+    num_heads: 8
+    dim_feedforward: 1024
+    dropout: 0.1
+    
+  vam:  # Vertebral Attention Module
+    enabled: true
+    num_layers: 3  # [1, 2, 3, 4] for tuning
+    num_heads: 8
+    dropout: 0.1
+    use_anatomical_bias: true
+    bias_type: "bilateral"  # "bilateral" for AP, "sagittal" for LA
+    
+  decoder:
+    type: "multi_scale"  # "simple" or "multi_scale"
+    channels: 128
+    dropout: 0.2
+    
+  uncertainty:  # Phase 3 only
+    enabled: true
+    type: "learned"  # "learned", "heatmap_spread", or "combined"
+    feature_dim: 256
+
+# ==============================================================================
+# Loss Function
+# ==============================================================================
+loss:
+  # Component types
+  heatmap_type: "mse"  # "mse" or "focal_mse"
+  coord_type: "wing"  # "wing", "l1", or "awing"
+  use_anatomical: true
+  use_uncertainty: true  # NLL loss for uncertainty calibration
+  
+  # Component weights (λ)
+  lambda_heatmap: 1.0
+  lambda_coord: 0.5
+  lambda_anatomical: 0.1
+  lambda_uncertainty: 0.1
+  
+  # Wing loss parameters
+  wing:
+    w: 10.0
+    epsilon: 2.0
+    
+  # Focal MSE parameters
+  focal_mse:
+    gamma: 2.0
+    
+  # Anatomical loss parameters
+  anatomical:
+    order_weight: 1.0
+    parallel_weight: 0.1
+    ratio_weight: 0.1
+
+# ==============================================================================
+# Training Schedule
+# ==============================================================================
+training:
+  # Basic settings
+  num_epochs: 60
+  batch_size: 8
+  accumulation_steps: 1  # Gradient accumulation for effective larger batch
+  
+  # Multi-phase training strategy
+  phases:
+    # Phase 1: Warm-up (freeze backbone)
+    warmup:
+      epochs: 5
+      freeze_backbone: true
+      lr_start: 0.0001
+      lr_end: 0.001
+      
+    # Phase 2: Fine-tuning (unfreeze backbone)
+    finetune:
+      epochs: 45
+      freeze_backbone: false  # Unfreeze last 2 stages
+      unfreeze_stages: [3, 4]  # Which stages to unfreeze
+      
+    # Phase 3: Refinement (optional)
+    refinement:
+      enabled: false
+      epochs: 10
+      lr: 0.00001
+      
+  # Mixed precision training (for memory efficiency)
+  use_amp: false  # Automatic Mixed Precision
+  
+# ==============================================================================
+# Optimizer
+# ==============================================================================
+optimizer:
+  type: "AdamW"  # ["Adam", "AdamW", "SGD", "RAdam"]
+  
+  # Learning rates (per parameter group)
+  lr_backbone: 0.0001  # Lower for pretrained
+  lr_transformer: 0.001
+  lr_vam: 0.001
+  lr_decoder: 0.001
+  
+  # AdamW parameters
+  weight_decay: 0.01
+  betas: [0.9, 0.999]
+  eps: 0.00000001
+  
+  # Gradient clipping
+  gradient_clip: 1.0
+
+# ==============================================================================
+# Learning Rate Scheduler
+# ==============================================================================
+scheduler:
+  type: "cosine_warmup"  # ["cosine", "cosine_warmup", "step", "reduce_on_plateau"]
+  
+  # Cosine annealing with warm restarts
+  cosine:
+    T_0: 10  # Initial cycle length
+    T_mult: 2  # Cycle length multiplier
+    eta_min: 0.000001  # Minimum LR
+    
+  # Step decay
+  step:
+    step_size: 15
+    gamma: 0.1
+    
+  # Reduce on plateau
+  plateau:
+    factor: 0.5
+    patience: 5
+    min_lr: 0.000001
+    
+  # Warmup (linear warmup for initial epochs)
+  warmup_epochs: 5
+  warmup_start_lr: 0.0001
+
+# ==============================================================================
+# Regularization
+# ==============================================================================
+regularization:
+  # Dropout rates
+  backbone_dropout: 0.0  # Usually 0 for pretrained
+  transformer_dropout: 0.1
+  vam_dropout: 0.1
+  decoder_dropout: 0.2
+  
+  # Label smoothing (for heatmaps)
+  label_smoothing: 0.1
+  
+  # Stochastic depth (for transformer)
+  stochastic_depth: 0.1
+  
+  # Mixup augmentation
+  mixup:
+    enabled: false
+    alpha: 0.2
+
+# ==============================================================================
+# Data Augmentation
+# ==============================================================================
+augmentation:
+  # Geometric transforms (applied to image + keypoints)
+  geometric:
+    shift_scale_rotate:
+      enabled: true
+      shift_limit: 0.1
+      scale_limit: 0.15
+      rotate_limit: 15
+      p: 0.8
+      
+    horizontal_flip:
+      enabled: true  # Only for AP view!
+      p: 0.5
+      
+    affine_shear:
+      enabled: true
+      shear_limit: 10
+      p: 0.3
+      
+  # Intensity transforms (image only)
+  intensity:
+    brightness_contrast:
+      enabled: true
+      brightness_limit: 0.2
+      contrast_limit: 0.2
+      p: 0.8
+      
+    gaussian_noise:
+      enabled: true
+      var_limit: [10, 50]
+      p: 0.5
+      
+    gaussian_blur:
+      enabled: true
+      blur_limit: [3, 7]
+      p: 0.3
+      
+    clahe:
+      enabled: true
+      clip_limit: 4.0
+      p: 0.5
+      
+  # Cutout/dropout
+  cutout:
+    enabled: true
+    max_holes: 8
+    max_height: 32
+    max_width: 32
+    p: 0.3
+
+# ==============================================================================
+# Data Loading
+# ==============================================================================
+data:
+  # Image preprocessing
+  image_size: [512, 512]
+  normalize:
+    mean: [0.485, 0.456, 0.406]
+    std: [0.229, 0.224, 0.225]
+    
+  # Heatmap generation
+  heatmap:
+    sigma: 2.0  # Gaussian sigma for heatmap generation
+    size: [512, 512]
+    
+  # Data loading
+  num_workers: 2
+  pin_memory: true
+  prefetch_factor: 2
+  
+  # Train/val split
+  val_split: 0.15
+  stratify_by_grade: true  # Stratify by spondylolisthesis grade
+
+# ==============================================================================
+# Evaluation
+# ==============================================================================
+evaluation:
+  # Metrics to compute
+  metrics:
+    - "MED_mm"  # Mean Error Distance in mm (primary metric)
+    - "MED_px"  # Mean Error Distance in pixels
+    - "SDR@4mm"  # Success Detection Rate at 4mm
+    - "SDR@5mm"
+    - "SDR@6mm"
+    - "SDR@8mm"
+    - "std_dev"  # Standard deviation of errors
+    - "max_error"
+    
+  # Per-vertebra analysis
+  per_vertebra: true
+  
+  # Pixel spacing for mm conversion
+  pixel_spacing: 0.5  # mm/pixel (calibrate per image if available)
+
+# ==============================================================================
+# Checkpointing & Logging
+# ==============================================================================
+checkpointing:
+  save_dir: "experiments/results/tuning"
+  save_best: true
+  save_last: true
+  save_every: 10
+  monitor: "val_med_mm"
+  mode: "min"
+  
+early_stopping:
+  enabled: true
+  patience: 15
+  monitor: "val_med_mm"
+  mode: "min"
+  min_delta: 0.01
+
+logging:
+  use_tensorboard: true
+  use_wandb: false
+  log_every_n_steps: 10
+  log_images_every: 100

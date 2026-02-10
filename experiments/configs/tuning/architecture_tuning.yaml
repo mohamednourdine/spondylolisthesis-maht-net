@@ -1,0 +1,348 @@
+# ==============================================================================
+# MAHT-Net Hyperparameter Tuning - Architecture Configuration
+# ==============================================================================
+# Configurations for model architecture tuning:
+# - Transformer Bridge depth and dimensions
+# - Vertebral Attention Module (VAM) depth
+# - Decoder configuration
+# - Backbone freeze strategy
+# ==============================================================================
+
+_base_: "maht_net_base.yaml"
+
+experiments:
+  # --------------------------------------------------------------------------
+  # Experiment 1: Transformer Depth
+  # --------------------------------------------------------------------------
+  - name: "transformer_2_layers"
+    description: "Lightweight transformer (faster training)"
+    model:
+      transformer_bridge:
+        num_layers: 2
+        
+  - name: "transformer_4_layers"
+    description: "Default transformer depth (recommended)"
+    model:
+      transformer_bridge:
+        num_layers: 4
+        
+  - name: "transformer_6_layers"
+    description: "Deep transformer (may need more data)"
+    model:
+      transformer_bridge:
+        num_layers: 6
+        
+  - name: "transformer_8_layers"
+    description: "Very deep transformer (potential overfitting)"
+    model:
+      transformer_bridge:
+        num_layers: 8
+
+  # --------------------------------------------------------------------------
+  # Experiment 2: Transformer Attention Heads
+  # --------------------------------------------------------------------------
+  - name: "transformer_4_heads"
+    model:
+      transformer_bridge:
+        num_heads: 4
+        
+  - name: "transformer_8_heads"
+    description: "Default attention heads"
+    model:
+      transformer_bridge:
+        num_heads: 8
+        
+  - name: "transformer_16_heads"
+    model:
+      transformer_bridge:
+        num_heads: 16
+
+  # --------------------------------------------------------------------------
+  # Experiment 3: Transformer Feedforward Dimension
+  # --------------------------------------------------------------------------
+  - name: "transformer_ff_512"
+    model:
+      transformer_bridge:
+        dim_feedforward: 512
+        
+  - name: "transformer_ff_1024"
+    description: "Default feedforward dimension"
+    model:
+      transformer_bridge:
+        dim_feedforward: 1024
+        
+  - name: "transformer_ff_2048"
+    model:
+      transformer_bridge:
+        dim_feedforward: 2048
+
+  # --------------------------------------------------------------------------
+  # Experiment 4: VAM Depth (Key ablation)
+  # --------------------------------------------------------------------------
+  - name: "vam_1_layer"
+    description: "Minimal VAM"
+    model:
+      vam:
+        num_layers: 1
+        
+  - name: "vam_2_layers"
+    description: "Light VAM"
+    model:
+      vam:
+        num_layers: 2
+        
+  - name: "vam_3_layers"
+    description: "Default VAM depth (recommended)"
+    model:
+      vam:
+        num_layers: 3
+        
+  - name: "vam_4_layers"
+    description: "Deep VAM"
+    model:
+      vam:
+        num_layers: 4
+
+  # --------------------------------------------------------------------------
+  # Experiment 5: VAM Configuration
+  # --------------------------------------------------------------------------
+  - name: "vam_4_heads"
+    model:
+      vam:
+        num_heads: 4
+        
+  - name: "vam_8_heads"
+    description: "Default VAM heads"
+    model:
+      vam:
+        num_heads: 8
+
+  - name: "vam_no_anatomical_bias"
+    description: "VAM without anatomical prior"
+    model:
+      vam:
+        use_anatomical_bias: false
+        
+  - name: "vam_with_anatomical_bias"
+    description: "VAM with anatomical prior (recommended)"
+    model:
+      vam:
+        use_anatomical_bias: true
+        bias_type: "bilateral"
+
+  # --------------------------------------------------------------------------
+  # Experiment 6: Feature Dimension (d_model)
+  # --------------------------------------------------------------------------
+  - name: "d_model_128"
+    description: "Smaller feature dimension (faster)"
+    model:
+      d_model: 128
+      backbone:
+        out_channels: 128
+      transformer_bridge:
+        d_model: 128
+        dim_feedforward: 512
+        
+  - name: "d_model_256"
+    description: "Default feature dimension"
+    model:
+      d_model: 256
+      backbone:
+        out_channels: 256
+      transformer_bridge:
+        d_model: 256
+        dim_feedforward: 1024
+        
+  - name: "d_model_512"
+    description: "Larger feature dimension"
+    model:
+      d_model: 512
+      backbone:
+        out_channels: 512
+      transformer_bridge:
+        d_model: 512
+        dim_feedforward: 2048
+
+  # --------------------------------------------------------------------------
+  # Experiment 7: Decoder Configuration
+  # --------------------------------------------------------------------------
+  - name: "decoder_simple"
+    description: "Simple upsampling decoder (baseline)"
+    model:
+      decoder:
+        type: "simple"
+        channels: 128
+        
+  - name: "decoder_multiscale"
+    description: "Multi-scale with skip connections (recommended)"
+    model:
+      decoder:
+        type: "multi_scale"
+        channels: 128
+        
+  - name: "decoder_multiscale_256"
+    description: "Wider multi-scale decoder"
+    model:
+      decoder:
+        type: "multi_scale"
+        channels: 256
+
+  # --------------------------------------------------------------------------
+  # Experiment 8: Backbone Freeze Strategy
+  # --------------------------------------------------------------------------
+  - name: "freeze_0"
+    description: "Fully unfrozen backbone (fine-tune everything)"
+    model:
+      backbone:
+        freeze_stages: 0
+        
+  - name: "freeze_1"
+    description: "Freeze first stage only"
+    model:
+      backbone:
+        freeze_stages: 1
+        
+  - name: "freeze_2"
+    description: "Freeze first two stages (recommended)"
+    model:
+      backbone:
+        freeze_stages: 2
+        
+  - name: "freeze_3"
+    description: "Mostly frozen backbone"
+    model:
+      backbone:
+        freeze_stages: 3
+        
+  - name: "freeze_4"
+    description: "Fully frozen backbone (feature extraction only)"
+    model:
+      backbone:
+        freeze_stages: 4
+
+  # --------------------------------------------------------------------------
+  # Experiment 9: Dropout Rates
+  # --------------------------------------------------------------------------
+  - name: "dropout_light"
+    description: "Light dropout (may overfit)"
+    regularization:
+      transformer_dropout: 0.05
+      vam_dropout: 0.05
+      decoder_dropout: 0.1
+      
+  - name: "dropout_moderate"
+    description: "Moderate dropout (default)"
+    regularization:
+      transformer_dropout: 0.1
+      vam_dropout: 0.1
+      decoder_dropout: 0.2
+      
+  - name: "dropout_heavy"
+    description: "Heavy dropout (strong regularization)"
+    regularization:
+      transformer_dropout: 0.2
+      vam_dropout: 0.2
+      decoder_dropout: 0.3
+
+  # --------------------------------------------------------------------------
+  # Experiment 10: Uncertainty Estimation Type (Phase 3)
+  # --------------------------------------------------------------------------
+  - name: "uncertainty_learned"
+    description: "MLP-based uncertainty (default)"
+    model:
+      uncertainty:
+        enabled: true
+        type: "learned"
+        
+  - name: "uncertainty_heatmap"
+    description: "Heatmap spread-based uncertainty"
+    model:
+      uncertainty:
+        enabled: true
+        type: "heatmap_spread"
+        
+  - name: "uncertainty_combined"
+    description: "Combined learned + heatmap uncertainty"
+    model:
+      uncertainty:
+        enabled: true
+        type: "combined"
+
+  # --------------------------------------------------------------------------
+  # Experiment 11: Model Variants (from architecture spec)
+  # --------------------------------------------------------------------------
+  - name: "maht_net_tiny"
+    description: "MAHT-Net-T: Tiny variant for fast training (Colab)"
+    model:
+      d_model: 256
+      transformer_bridge:
+        num_layers: 2
+        num_heads: 4
+        dim_feedforward: 512
+      vam:
+        num_layers: 2
+        num_heads: 4
+      decoder:
+        channels: 64
+        
+  - name: "maht_net_small"
+    description: "MAHT-Net-S: Small variant (recommended)"
+    model:
+      d_model: 256
+      transformer_bridge:
+        num_layers: 4
+        num_heads: 8
+        dim_feedforward: 1024
+      vam:
+        num_layers: 3
+        num_heads: 8
+      decoder:
+        channels: 128
+        
+  - name: "maht_net_base"
+    description: "MAHT-Net-B: Base variant (best accuracy)"
+    model:
+      d_model: 512
+      transformer_bridge:
+        num_layers: 6
+        num_heads: 8
+        dim_feedforward: 2048
+      vam:
+        num_layers: 4
+        num_heads: 8
+      decoder:
+        channels: 256
+
+# ==============================================================================
+# Recommended configuration
+# ==============================================================================
+recommended:
+  name: "arch_recommended"
+  description: "Recommended architecture configuration (MAHT-Net-S)"
+  model:
+    phase: 3
+    d_model: 256
+    backbone:
+      type: "efficientnet_v2_s"
+      pretrained: true
+      freeze_stages: 2
+      out_channels: 256
+    transformer_bridge:
+      enabled: true
+      num_layers: 4
+      num_heads: 8
+      dim_feedforward: 1024
+      dropout: 0.1
+    vam:
+      enabled: true
+      num_layers: 3
+      num_heads: 8
+      dropout: 0.1
+      use_anatomical_bias: true
+    decoder:
+      type: "multi_scale"
+      channels: 128
+      dropout: 0.2
+    uncertainty:
+      enabled: true
+      type: "learned"
